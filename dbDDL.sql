@@ -184,6 +184,23 @@ END;
 
 DELIMITER ;
 
+-- Trigger that automatically assign users to different roles (Students, Instructors, Admins)
+DELIMITER //
+CREATE TRIGGER after_user_insert_role
+AFTER INSERT ON User
+FOR EACH ROW
+BEGIN
+    IF NEW.role = 'Student' THEN
+        INSERT INTO Student (student_id) VALUES (NEW.user_id);
+    ELSEIF NEW.role = 'Instructor' THEN
+        INSERT INTO Instructor (instructor_id, department) VALUES (NEW.user_id, 'Unknown');
+    ELSEIF NEW.role = 'Admin' THEN
+         INSERT INTO Admin (admin_id, access_level, department) VALUES (NEW.user_id, 'Standard', 'Unknown');
+    END IF;
+END;
+//
+DELIMITER ;
+
 -- Function to calculate student progress on a topic
 DELIMITER //
 CREATE FUNCTION CalculateTopicProgress(
@@ -211,7 +228,7 @@ BEGIN
     
     -- Calculate progress percentage
     IF total_problems > 0 THEN
-        SET progress_percentage = (solved_problems / total_problems) * 100;
+        SET progress_percentage = (solved_problems / CAST(total_problems AS FLOAT)) * 100;
     ELSE
         SET progress_percentage = 0;
     END IF;
@@ -265,7 +282,7 @@ SELECT
     T.topic_id,
     T.name AS topic_name,
     COUNT(DISTINCT A.problem_id) AS problems_attempted,
-    SUM(CASE WHEN A.status = 'Completed' THEN 1 ELSE 0 END) AS problems_completed,
+    SUM(CASE WHEN A.status = 'Completed' THEN 1 ELSE 0 END) / NULLIF(COUNT(A.attempt_id), 0) * 100 AS completion_rate,
     AVG(A.score) AS average_score,
     AVG(A.time_taken) AS average_time_taken,
     AVG(A.hints_used) AS average_hints_used
