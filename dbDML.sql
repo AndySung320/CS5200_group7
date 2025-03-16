@@ -6,23 +6,38 @@ INSERT INTO User (name, email, password, profile_info, last_login, role, registr
 ('David Miller', 'david@email.com', 'hashed_password_4', 'System administrator for SQL platforms.', '2024-03-13 10:45:00', 'Admin', '2023-11-10'),
 ('Emma Watson', 'emma@email.com', 'hashed_password_5', 'Data analyst focusing on big data.', '2024-03-14 18:00:00', 'Student', '2024-02-05'),
 ('Frank Thomas', 'frank@email.com', 'hashed_password_6', 'Full-stack developer.', '2024-03-15 21:10:00', 'Student', '2024-02-10'),
-('Grace Hopper', 'grace@email.com', 'hashed_password_7', 'Legendary computer scientist.', '2024-03-16 08:25:00', 'Admin', '2023-10-05');
+('Grace Hopper', 'grace@email.com', 'hashed_password_7', 'Legendary computer scientist.', '2024-03-16 08:25:00', 'Admin', '2023-10-05'),
+('Henry Ford', 'henry@email.com', 'hashed_password_8', 'Machine Learning Engineer.', '2024-03-17 14:40:00', 'Student', '2024-02-15'),
+('Ivy Green', 'ivy@email.com', 'hashed_password_9', 'Data Science Researcher.', '2024-03-18 19:30:00', 'Student', '2024-02-20'),
+('Jack Daniels', 'jack@email.com', 'hashed_password_10', 'Database Administrator.', '2024-03-19 11:20:00', 'Instructor', '2024-01-30'),
+('Kate Winslet', 'kate@email.com', 'hashed_password_11', 'Software Engineer.', '2024-03-20 17:15:00', 'Instructor', '2023-12-10'),
+('Luke Skywalker', 'luke@email.com', 'hashed_password_12', 'SQL Performance Expert.', '2024-03-21 10:05:00', 'Instructor', '2023-11-25'),
+('Monica Bell', 'monica@email.com', 'hashed_password_13', 'Network Security Specialist.', '2024-03-22 09:45:00', 'Instructor', '2023-11-05'),
+('Nathan Drake', 'nathan@email.com', 'hashed_password_14', 'System Architect.', '2024-03-23 13:55:00', 'Instructor', '2023-10-30'),
+('Olivia Benson', 'olivia@email.com', 'hashed_password_15', 'Lead SQL Trainer.', '2024-03-24 18:25:00', 'Instructor', '2023-10-15'),
+('Paul Newman', 'paul@email.com', 'hashed_password_16', 'Senior DBA.', '2024-03-25 14:10:00', 'Admin', '2023-09-30'),
+('Quincy Jones', 'quincy@email.com', 'hashed_password_17', 'Infrastructure Engineer.', '2024-03-26 12:45:00', 'Admin', '2023-09-15'),
+('Rachel Adams', 'rachel@email.com', 'hashed_password_18', 'Data Governance Specialist.', '2024-03-27 16:40:00', 'Admin', '2023-09-01'),
+('Steve Rogers', 'steve@email.com', 'hashed_password_19', 'Cloud Database Engineer.', '2024-03-28 11:35:00', 'Admin', '2023-08-20'),
+('Tony Stark', 'tony@email.com', 'hashed_password_20', 'High-Performance Computing.', '2024-03-29 20:50:00', 'Admin', '2023-08-10'),
+('Uma Thurman', 'uma@email.com', 'hashed_password_21', 'Enterprise Architect.', '2024-03-30 09:55:00', 'Admin', '2023-07-30');
 
 -- Insert data into Student table (Student ID must match User ID)
 INSERT INTO Student (student_id) VALUES
-(1),
-(5),
-(6);
+(1), (5), (6), (8), (9), (10), (11);
 
 -- Insert data into Instructor table (Instructor ID must match User ID)
 INSERT INTO Instructor (instructor_id, department) VALUES
-(2, 'Computer Science'),
-(3, 'Information Technology');
+(2, 'Computer Science'), (3, 'Information Technology'), (12, 'Data Science'),
+(13, 'Cybersecurity'), (14, 'Cloud Computing'), (15, 'Software Engineering'), (16, 'Database Administration');
+
 
 -- Insert data into Admin table (Admin ID must match User ID)
 INSERT INTO Admin (admin_id, access_level, department) VALUES
-(4, 'SuperAdmin', 'System Administration'),
-(7, 'Moderator', 'Platform Support');
+(4, 'SuperAdmin', 'System Administration'), (7, 'Moderator', 'Platform Support'),
+(17, 'Data Security', 'Data Management'), (18, 'DBA', 'Database Maintenance'),
+(19, 'Infrastructure Lead', 'Cloud Computing'), (20, 'Compliance', 'Data Governance'),
+(21, 'Network Admin', 'IT Operations');
 
 -- Insert data into Topic table
 INSERT INTO Topic (name, description) VALUES
@@ -86,18 +101,21 @@ INSERT INTO Comment (problem_id, user_id, content, timestamp) VALUES
 
 
 INSERT INTO LearningAnalytics (student_id, problem_id, error_frequency, time_spent, completion_status) VALUES
-(1, 1, 2, 120, 'Completed'),
-(5, 2, 0, 150, 'Completed'),
-(6, 3, 5, 200, 'Abandoned');  
+(1, 1, 2, 120, 'Completed'), (5, 2, 0, 150, 'Completed'), (6, 3, 5, 200, 'Abandoned'),
+(8, 4, 1, 180, 'Completed'), (9, 5, 3, 170, 'In Progress'), (10, 6, 2, 190, 'Failed'),
+(11, 7, 0, 220, 'Completed');
 
 -- Insert data into Badge table
 INSERT INTO Badge (name, criteria, icon) VALUES
 ('SQL Beginner', 'Complete 3 easy SQL problems.', 'beginner.png'),
 ('SQL Master', 'Solve all hard SQL problems.', 'master.png'),
-('Performance Guru', 'Optimize at least 5 queries.', 'guru.png');
+('Performance Guru', 'Optimize at least 5 queries.', 'guru.png'),
+('Stored Procedure Pro', 'Successfully create 3 stored procedures.', 'procedure.png'),
+('Subquery Expert', 'Solve 5 problems using subqueries.', 'subquery.png'),
+('Ranking Champion', 'Use ranking functions in at least 3 queries.', 'ranking.png'),
+('Database Designer', 'Understand normalization and design a schema.', 'design.png');
 
 -- Insert data into StudentBadge table
 INSERT INTO StudentBadge (student_id, badge_id, earned_date) VALUES
-(1, 1, '2024-03-10 17:00:00'),
-(5, 2, '2024-03-11 19:00:00'),
-(6, 3, '2024-03-12 12:30:00');
+(1, 1, '2024-03-10 17:00:00'), (5, 2, '2024-03-11 19:00:00'), (6, 3, '2024-03-12 12:30:00'),
+(8, 1, '2024-03-14 14:00:00'), (9, 2, '2024-03-15 10:30:00'), (10, 3, '2024-03-16 08:20:00'), (11, 1, '2024-03-17 16:40:00');
