@@ -1,5 +1,5 @@
 -- Insert data into User table
-INSERT INTO User (name, email, password, profile_info, last_login, role, registration_date) VALUES
+INSERT INTO User (name, email, password, profile_info, last_login, role, date_joined) VALUES
 ('Alice Johnson', 'alice@email.com', 'hashed_password_1', 'Passionate about SQL.', '2024-03-10 12:30:00', 'Student', '2024-02-01'),
 ('Bob Smith', 'bob@email.com', 'hashed_password_2', 'Expert in database management.', '2024-03-11 15:20:00', 'Instructor', '2024-01-15'),
 ('Charlie Brown', 'charlie@email.com', 'hashed_password_3', 'Backend developer specializing in SQL optimization.', '2024-03-12 09:15:00', 'Instructor', '2023-12-20'),
