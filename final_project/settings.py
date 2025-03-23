@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY')
 ENVIRONMENT = os.environ.get('DJANGO_ENV')
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG')
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ["*"] if DEBUG else ["your-production-domain.com"]
 
@@ -39,7 +39,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'group7_app.apps.Group7AppConfig',
+    'users.apps.UsersConfig'
 ]
+AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -84,7 +87,7 @@ if ENVIRONMENT == "production":
             "PASSWORD": os.environ.get("DATABASE_PASSWORD"),
             "HOST": os.environ.get("DB_HOST"),  # GCP MySQL address
             "PORT": os.environ.get("DB_PORT", "3306"),
-            "OPTIONS": {"charset": "utf8mb4"},
+            "OPTIONS": {"charset": "utf8mb4"}
         }
     }
 else:
@@ -97,6 +100,11 @@ else:
             "HOST": "localhost",
             "PORT": "3306",
             "OPTIONS": {"charset": "utf8mb4"},
+        # TEST configuration is used when running tests (e.g., with `python manage.py test`)
+        # 'MIRROR': 'default' tells Django to reuse the same database configuration for testing,
+        # instead of creating a separate test database. This is useful when using an existing test setup,
+        # or when database creation is restricted or slow (e.g., in CI environments).
+            'TEST': {'MIRROR': 'default'}
         }
     }
 
