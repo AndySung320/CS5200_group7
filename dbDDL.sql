@@ -12,8 +12,12 @@ CREATE TABLE User (
     last_login DATETIME,
     role ENUM('Student', 'Instructor', 'Admin') NOT NULL DEFAULT 'Student',
     INDEX idx_email (email),
-    registration_date DATE NOT NULL
+    date_joined DATETIME NOT NULL
 );
+ALTER TABLE User
+ADD COLUMN is_superuser BOOLEAN DEFAULT FALSE AFTER role,
+ADD COLUMN is_staff BOOLEAN DEFAULT FALSE AFTER is_superuser,
+ADD COLUMN is_active BOOLEAN DEFAULT TRUE AFTER is_staff;
 
 -- Student table
 CREATE TABLE Student (
