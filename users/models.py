@@ -99,6 +99,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ['name']
 
     class Meta:
+        # NOTE:
+        # This model is linked to a pre-existing table in the database that was created manually (e.g., via raw SQL).
+        # - `managed = False` tells Django not to create, modify, or delete this table during migrations.
+        # - `db_table = "user"` explicitly specifies the table name to ensure Django maps the model correctly.
+        #
+        # IMPORTANT: Always include both settings when working with externally managed tables
+        # to avoid migration conflicts, accidental table creation, or schema mismatches.
         db_table = "user"
         managed = False
     
