@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+from datetime import timedelta
+
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -32,6 +34,25 @@ ALLOWED_HOSTS = ["*"] if DEBUG else ["your-production-domain.com"]
 
 # Application definition
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_BLACKLIST_ENABLED': True,
+    
+    # Tells SimpleJWT to use the custom field 'user_id' as the user identifier.
+    # By default, it uses 'id', but our User model defines 'user_id' as the primary key.
+    'USER_ID_FIELD': 'user_id'
+}
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -40,7 +61,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     'group7_app.apps.Group7AppConfig',
-    'users.apps.UsersConfig'
+    'users.apps.UsersConfig',
+    'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
 ]
 AUTH_USER_MODEL = 'users.User'
 
