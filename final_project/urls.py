@@ -19,6 +19,6 @@ from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('', include('group7_app.urls')),
-    path('', include('users.urls'))
+    path('', include('group7_app.urls')),   # home page
+    path('api/auth/', include('users.urls')),   # register、login、token
 ]
