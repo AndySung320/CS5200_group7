@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'sql_app.apps.SqlAppConfig',
 ]
 AUTH_USER_MODEL = 'users.User'
 
@@ -116,7 +117,7 @@ if ENVIRONMENT == "production":
             "ENGINE": "django.db.backends.mysql",
             "NAME": os.environ.get("DB_NAME"),
             "USER": os.environ.get("DB_USER"),
-            "PASSWORD": os.environ.get("DATABASE_PASSWORD"),
+            "PASSWORD": os.environ.get("DB_PASSWORD"),
             "HOST": os.environ.get("DB_HOST"),  # GCP MySQL address
             "PORT": os.environ.get("DB_PORT", "3306"),
             "OPTIONS": {"charset": "utf8mb4"}

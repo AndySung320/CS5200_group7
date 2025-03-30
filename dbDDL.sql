@@ -73,16 +73,16 @@ CREATE TABLE Hint (
 -- Attempt table
 CREATE TABLE Attempt (
     attempt_id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id INT NOT NULL,
+    user_id INT NOT NULL,
     problem_id INT NOT NULL,
     submission_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     score DECIMAL(5,2) DEFAULT 0,
     time_taken INT COMMENT 'Time taken in seconds',
     status ENUM('Completed', 'In Progress', 'Failed', 'Abandoned') NOT NULL,
     hints_used INT DEFAULT 0,
-    FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES User(user_id) ON DELETE CASCADE,
     FOREIGN KEY (problem_id) REFERENCES SQLProblem(problem_id) ON DELETE CASCADE,
-    INDEX idx_student_problem (student_id, problem_id)
+    INDEX idx_user_problem (user_id, problem_id)
 );
 
 -- Message table
@@ -279,25 +279,25 @@ END//
 DELIMITER ;
 
 -- Create a view for student performance analytics
-CREATE VIEW StudentPerformanceView AS
-SELECT 
-    S.student_id,
-    U.name AS student_name,
-    T.topic_id,
-    T.name AS topic_name,
-    COUNT(DISTINCT A.problem_id) AS problems_attempted,
-    SUM(CASE WHEN A.status = 'Completed' THEN 1 ELSE 0 END) / NULLIF(COUNT(A.attempt_id), 0) * 100 AS completion_rate,
-    AVG(A.score) AS average_score,
-    AVG(A.time_taken) AS average_time_taken,
-    AVG(A.hints_used) AS average_hints_used
-FROM 
-    Student S
-    JOIN User U ON S.student_id = U.user_id
-    JOIN Attempt A ON S.student_id = A.student_id
-    JOIN SQLProblem P ON A.problem_id = P.problem_id
-    JOIN Topic T ON P.topic_id = T.topic_id
-GROUP BY 
-    S.student_id, T.topic_id;
+-- CREATE VIEW StudentPerformanceView AS
+-- SELECT 
+--     S.student_id,
+--     U.name AS student_name,
+--     T.topic_id,
+--     T.name AS topic_name,
+--     COUNT(DISTINCT A.problem_id) AS problems_attempted,
+--     SUM(CASE WHEN A.status = 'Completed' THEN 1 ELSE 0 END) / NULLIF(COUNT(A.attempt_id), 0) * 100 AS completion_rate,
+--     AVG(A.score) AS average_score,
+--     AVG(A.time_taken) AS average_time_taken,
+--     AVG(A.hints_used) AS average_hints_used
+-- FROM 
+--     Student S
+--     JOIN User U ON S.student_id = U.user_id
+--     JOIN Attempt A ON S.student_id = A.student_id
+--     JOIN SQLProblem P ON A.problem_id = P.problem_id
+--     JOIN Topic T ON P.topic_id = T.topic_id
+-- GROUP BY 
+--     S.student_id, T.topic_id;
 
 -- Create a view for problem difficulty statistics
 CREATE VIEW ProblemDifficultyStats AS

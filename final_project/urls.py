@@ -21,4 +21,5 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path('', include('group7_app.urls')),   # home page
     path('api/auth/', include('users.urls')),   # register、login、token
+    path('api/', include('sql_app.urls'))
 ]

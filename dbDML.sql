@@ -42,13 +42,13 @@ UPDATE Admin SET access_level = 'Network Admin', department = 'IT Operations' WH
 
 -- Insert data into Topic table
 INSERT INTO Topic (name, description) VALUES
-('SQL Joins', 'Understanding INNER JOIN, LEFT JOIN, RIGHT JOIN, and FULL JOIN.'),
-('Aggregation Functions', 'Using GROUP BY, SUM, AVG, COUNT, MIN, and MAX.'),
-('Indexes & Performance', 'How indexing affects performance in SQL queries.'),
-('Stored Procedures', 'Writing and executing stored procedures in SQL.'),
-('Subqueries', 'Using subqueries in SELECT, FROM, and WHERE clauses.'),
-('Window Functions', 'Understanding RANK(), ROW_NUMBER(), and PARTITION BY.'),
-('Data Normalization', 'Understanding normalization forms and database design.');
+('Select', 'Basic SELECT statements, filtering with WHERE, and projecting columns.'),
+('Aggregation Functions', 'Using GROUP BY with functions like SUM, AVG, COUNT, MIN, and MAX.'),
+('Sub Query', 'Using subqueries in SELECT, FROM, and WHERE clauses.'),
+('Join', 'Understanding INNER JOIN, LEFT JOIN, RIGHT JOIN, and FULL JOIN.'),
+('With', 'Using WITH clauses (Common Table Expressions) to simplify complex queries.'),
+('In-Line View', 'Creating temporary views within queries for filtering and aggregation.'),
+('Window Function', 'Advanced analytics using ROW_NUMBER(), RANK(), DENSE_RANK(), and PARTITION BY.');
 
 -- Insert data into SQLProblem table
 INSERT INTO SQLProblem (title, description, difficulty_level, topic_id) VALUES
@@ -71,7 +71,7 @@ INSERT INTO Badge (name, criteria, icon) VALUES
 ('Database Designer', 'Understand normalization and design a schema.', 'design.png');
 
 -- Insert data into Attempt table
-INSERT INTO Attempt (student_id, problem_id, submission_date, score, time_taken, status, hints_used) VALUES
+INSERT INTO Attempt (user_id, problem_id, submission_date, score, time_taken, status, hints_used) VALUES
 (1, 1, '2024-03-10 14:00:00', 85.50, 120, 'Completed', 1),
 (5, 2, '2024-03-11 16:30:00', 92.00, 150, 'Completed', 2),
 (6, 3, '2024-03-12 10:15:00', 45.75, 200, 'Failed', 0),
