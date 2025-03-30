@@ -1,0 +1,23 @@
+{
+    "problem_id": 4,
+    "title": "Game Play Analysis I",
+    "description": "Write an SQL query to report the first login date for each player.\nReturn the result table in any order.",
+    "difficulty_level": "Easy",
+    "topic_id": 2,
+    "requires_order": false,
+    "tables": [
+      {
+        "table_name": "Activity",
+        "columns": [
+          { "name": "player_id", "type": "int", "description": "ID of the player" },
+          { "name": "device_id", "type": "int", "description": "ID of the device used to play" },
+          { "name": "event_date", "type": "date", "description": "Date of the event" },
+          { "name": "games_played", "type": "int", "description": "Number of games played on the event date" }
+        ]
+      }
+    ],
+    "hints": [
+      "Use GROUP BY to group the records by player_id."
+    ]
+  }
+  
