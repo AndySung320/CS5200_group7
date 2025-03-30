@@ -76,12 +76,18 @@ INSTALLED_APPS = [
     'badges',
     'admin_tools',
     'analytics',
+    'users.apps.UsersConfig',
+    'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
+    'corsheaders',
+    'sql_app.apps.SqlAppConfig',
 ]
 
 # Custom User model
 AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -90,6 +96,13 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # React frontend
+]
+
+# If using cookies/sessions for auth
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = "final_project.urls"
 
@@ -116,12 +129,21 @@ if ENVIRONMENT == "production":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.mysql",
+<<<<<<< HEAD
             "NAME": "sql_learning_platform",
             "USER": "root",
             "PASSWORD": "Chong189",
             "HOST": "localhost",
             "PORT": "3307",
             "OPTIONS": {"charset": "utf8mb4"},
+=======
+            "NAME": os.environ.get("DB_NAME"),
+            "USER": os.environ.get("DB_USER"),
+            "PASSWORD": os.environ.get("DB_PASSWORD"),
+            "HOST": os.environ.get("DB_HOST"),  # GCP MySQL address
+            "PORT": os.environ.get("DB_PORT", "3306"),
+            "OPTIONS": {"charset": "utf8mb4"}
+>>>>>>> 1fa5d2c59b32a003674ef7956e8e08fce8f5c468
         }
     }
 else:
