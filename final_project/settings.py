@@ -15,31 +15,31 @@ from dotenv import load_dotenv
 import os
 from datetime import timedelta
 
+# Load environment variables from a .env file if available
 load_dotenv()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
-
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY')
-ENVIRONMENT = os.environ.get('DJANGO_ENV')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'your-default-secret-key')
+
+# Set the environment (e.g., 'production' or 'development')
+ENVIRONMENT = os.environ.get('DJANGO_ENV', 'development')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ["*"] if DEBUG else ["your-production-domain.com"]
 
-
-# Application definition
-
+# Django REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
 
+# Simple JWT configuration
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -48,23 +48,37 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_BLACKLIST_ENABLED': True,
     
-    # Tells SimpleJWT to use the custom field 'user_id' as the user identifier.
-    # By default, it uses 'id', but our User model defines 'user_id' as the primary key.
+    # If your custom User model uses 'user_id' as primary key:
     'USER_ID_FIELD': 'user_id'
 }
 
 INSTALLED_APPS = [
+    # Default Django apps
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
-    "django.contrib.messages",
+    "django.contrib.messages",  # Built-in messages framework (label: "messages")
     "django.contrib.staticfiles",
+
+    # Your custom apps
     'group7_app.apps.Group7AppConfig',
-    'users.apps.UsersConfig',
-    'rest_framework',
-    'rest_framework_simplejwt.token_blacklist',
+
+    # Third-party apps
+    "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+
+    # Your project apps
+    "users.apps.UsersConfig",
+    "messages.apps.MessagesConfig",
+    "notifications",
+    "comments",
+    'badges',
+    'admin_tools',
+    'analytics',
 ]
+
+# Custom User model
 AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
@@ -97,44 +111,36 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "final_project.wsgi.application"
 
-
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
+# Database configuration
 if ENVIRONMENT == "production":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.mysql",
-            "NAME": os.environ.get("DB_NAME"),
-            "USER": os.environ.get("DB_USER"),
-            "PASSWORD": os.environ.get("DATABASE_PASSWORD"),
-            "HOST": os.environ.get("DB_HOST"),  # GCP MySQL address
-            "PORT": os.environ.get("DB_PORT", "3306"),
-            "OPTIONS": {"charset": "utf8mb4"}
+            "NAME": "sql_learning_platform",
+            "USER": "root",
+            "PASSWORD": "Chong189",
+            "HOST": "localhost",
+            "PORT": "3307",
+            "OPTIONS": {"charset": "utf8mb4"},
         }
     }
 else:
+    # Fallback defaults for development if environment variables are missing
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.mysql",
-            "NAME": os.environ.get("DB_NAME"),
-            "USER": os.environ.get("DB_USER"),
-            "PASSWORD": os.environ.get("DB_PASSWORD"),
-            "HOST": "localhost",
-            "PORT": "3306",
+            "NAME": os.environ.get("DB_NAME", "sql_learning_platform"),
+            "USER": os.environ.get("DB_USER", "root"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", "Chong189"),
+            "HOST": os.environ.get("DB_HOST", "localhost"),
+            "PORT": os.environ.get("DB_PORT", "3306"),
             "OPTIONS": {"charset": "utf8mb4"},
-        # TEST configuration is used when running tests (e.g., with `python manage.py test`)
-        # 'MIRROR': 'default' tells Django to reuse the same database configuration for testing,
-        # instead of creating a separate test database. This is useful when using an existing test setup,
-        # or when database creation is restricted or slow (e.g., in CI environments).
-            'TEST': {'MIRROR': 'default'}
+            # Use the same database configuration for testing if needed.
+            'TEST': {'MIRROR': 'default'},
         }
     }
 
-
 # Password validation
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -144,25 +150,14 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
-
+# Internationalization settings
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
 STATIC_URL = "static/"
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
