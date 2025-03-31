@@ -16,5 +16,9 @@ class Message(models.Model):
     is_read = models.BooleanField(default=False)
     timestamp = models.DateTimeField(auto_now_add=True)
 
+class Meta:
+    db_table = "Message"
+    managed = False
+
     def __str__(self):
         return f"From {self.sender} to {self.recipient} at {self.timestamp}"

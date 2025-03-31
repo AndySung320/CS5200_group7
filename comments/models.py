@@ -16,5 +16,9 @@ class Comment(models.Model):
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        db_table = "Comment"
+        managed = False
+
     def __str__(self):
         return f"Comment by {self.user.username} on Problem {self.problem_id}"
