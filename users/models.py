@@ -87,6 +87,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=255)
+    profile_info = models.TextField(blank=True, null=True)
     role = models.CharField(max_length=20, choices=[('Student', 'Student'), ('Instructor', 'Instructor'), ('Admin', 'Admin')], default='Student')
     date_joined = models.DateTimeField(auto_now_add=True)
     is_staff = models.BooleanField(default=False)
