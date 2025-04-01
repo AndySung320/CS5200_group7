@@ -83,7 +83,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         "access": "<token>",
         "user_id": 3,
         "name": "Thomas",
-        "role": "Student"
+        "role": "Student",
+        "email": "thomas@example.com",
+        "profile_info": "I love SQL and biophysics."
     }
     """
     @classmethod
@@ -99,6 +101,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['user_id'] = self.user.user_id
         data['name'] = self.user.name
         data['role'] = self.user.role
+        data['email'] = self.user.email
+        data['profile_info'] = self.user.profile_info
         return data
 
 class UserUpdateSerializer(serializers.ModelSerializer):
