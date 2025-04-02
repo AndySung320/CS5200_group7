@@ -31,7 +31,7 @@ urlpatterns = [
     path("api/auth/", include("users.urls")),
     path("api/messages/", include("messages.urls")),
     path("api/notifications/", include("notifications.urls")),
-    path("api/comments/", include("comments.urls")),
+    path('api/comments/', include('comments.urls')),
     path("api/badges/", include("badges.urls")),
     path("api/admin/", include("admin_tools.urls")),
     path("api/analytics/", include("analytics.urls")),
