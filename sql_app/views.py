@@ -5,10 +5,11 @@ from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import SQLProblem
-from .serializers import SQLProblemListSerializer, SQLProblemDetailSerializer, AttemptSerializer
+from .models import SQLProblem, Attempt
+from .serializers import SQLProblemListSerializer, SQLProblemDetailSerializer, AttemptSerializer, AttemptHistorySerializer
 from utils.sql_sandbox import check_user_query
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Count, Case, When, IntegerField, FloatField, ExpressionWrapper, Value, F, Func
 
 @api_view(['GET'])
 def problem_list(request):
@@ -20,6 +21,7 @@ def problem_list(request):
     - Title
     - Difficulty level
     - Topic name
+    - Acceptance rate (rounded to 2 decimal places)
 
     The data is ordered by `problem_id` in ascending order.
 
@@ -32,20 +34,41 @@ def problem_list(request):
                 "problem_id": 1,
                 "title": "Find Top Seller",
                 "difficulty_level": "Medium",
-                "topic": "Aggregation"
+                "topic": "Aggregation",
+                "acceptance": 83.33
             },
             {
                 "problem_id": 2,
                 "title": "Employees Without Managers",
                 "difficulty_level": "Easy",
-                "topic": "JOIN"
+                "topic": "JOIN",
+                "acceptance": 100.0
             }
         ]
 
     Returns:
         Response: A JSON list of problems serialized via `SQLProblemListSerializer`.
     """
-    problems = SQLProblem.objects.all().order_by('problem_id')
+    problems = SQLProblem.objects.annotate(
+        total_attempts=Count("attempts"),
+        successful_attempts=Count(
+            Case(
+                When(attempts__status="Completed", then=1),
+                output_field=IntegerField()
+            )
+        ),
+        raw_acceptance=ExpressionWrapper(
+            Case(
+                When(total_attempts__gt=0,
+                    then=F('successful_attempts') * 100.0 / F('total_attempts')),
+                default=Value(0.0),
+                output_field=FloatField()
+            ),
+            output_field=FloatField()
+        ),
+        acceptance=Func(F('raw_acceptance'), function='ROUND', template='ROUND(%(expressions)s, 2)')
+    ).order_by('problem_id')
+
     serializer = SQLProblemListSerializer(problems, many=True)
     return Response(serializer.data)
 
@@ -78,8 +101,10 @@ def problem_detail(request, problem_id):
                 "topic": "JOIN",
                 "requires_order": false,
                 "tables": [...],
+                "input_data",
                 "hints": [...],
-                "expected_output": [...]
+                "expected_output": [...],
+                "acceptance": value (float)
             }
 
         404 Not Found:
@@ -182,3 +207,59 @@ class AttemptSubmitView(APIView):
             "score": score,
             "feedback": message
         }, status=status.HTTP_200_OK)
+
+
+class AttemptHistoryView(APIView):
+    """
+    API endpoint to retrieve a user's submission history for a specific SQL problem.
+
+    Method:
+        GET
+
+    URL:
+        /api/problems/<problem_id>/history/
+
+    Permissions:
+        - Requires authentication (JWT token)
+
+    Request Parameters:
+        - problem_id (int): The ID of the SQL problem
+
+    Behavior:
+        - Checks if the problem exists
+        - Retrieves all attempts made by the current user for the specified problem
+        - Orders attempts by submission date (most recent first)
+
+    Response (200 OK):
+        Returns a list of attempt records with the following fields:
+        [
+            {
+                "submission_date": "2024-04-01T14:32:00Z",
+                "score": 100.0,
+                "time_taken": 120,
+                "status": "Completed",
+                "hints_used": 1
+            },
+            ...
+        ]
+
+    Response (404 Not Found):
+        {
+            "error": "Problem not found"
+        }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, problem_id):
+        user = request.user
+
+        # Check if the problem exists
+        try:
+            problem = SQLProblem.objects.get(problem_id=problem_id)
+        except SQLProblem.DoesNotExist:
+            return Response({"error": "Problem not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Retrieve the user's submission history for this problem (ordered by most recent)
+        attempts = Attempt.objects.filter(user=user, problem=problem).order_by('-submission_date')
+        serializer = AttemptHistorySerializer(attempts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

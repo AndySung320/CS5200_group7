@@ -15,28 +15,31 @@ class SQLProblemListSerializer(serializers.ModelSerializer):
     typically in list views or overview pages.
 
     Features:
-    - Includes the problem's ID, title, difficulty level, and topic name.
+    - Includes the problem's ID, title, difficulty level, topic name, and acceptance rate.
     - The topic field is derived from the related Topic model's `name` attribute.
+    - The acceptance field represents the percentage of correct submissions (0.0 - 100.0).
 
     Fields:
         problem_id (int): Unique identifier for the problem.
         title (str): Title of the problem.
         difficulty_level (str): Difficulty level ('Easy', 'Medium', etc.).
         topic (str): Name of the related topic (e.g., 'JOIN', 'GROUP BY').
+        acceptance (float): Percentage of successful attempts, rounded to 2 decimal places.
 
     Example Output:
         {
             "problem_id": 1,
             "title": "Find the Top Seller",
             "difficulty_level": "Medium",
-            "topic": "Aggregation"
+            "topic": "Aggregation",
+            "acceptance": 83.33
         }
     """
     topic = serializers.CharField(source='topic.name')  ## Gets topic name from the related Topic model
-
+    acceptance = serializers.FloatField()
     class Meta:
         model = SQLProblem
-        fields = ['problem_id', 'title', 'difficulty_level', 'topic']
+        fields = ['problem_id', 'title', 'difficulty_level', 'topic', 'acceptance']
 
 class TableColumnSerializer(serializers.Serializer):
     """
@@ -140,24 +143,24 @@ class SQLProblemDetailSerializer(serializers.ModelSerializer):
             "topic": "JOIN",
             "requires_order": false,
             "tables": [...],
+            "input_data": [...],
             "hints": ["Try filtering by login count", "Use GROUP BY"],
-            "expected_output": [
-                {"user_id": 1, "name": "Alice"},
-                {"user_id": 2, "name": "Bob"}
-            ]
+            "expected_output": [...]
         }
     """
     topic = serializers.CharField(source='topic.name')
     hints = serializers.SerializerMethodField()
     tables = serializers.SerializerMethodField()
+    input_data = serializers.SerializerMethodField()
     expected_output = serializers.SerializerMethodField()
     requires_order = serializers.SerializerMethodField()
+    acceptance = serializers.SerializerMethodField()
 
     class Meta:
         model = SQLProblem
         fields = [
             'problem_id', 'title', 'description', 'difficulty_level',
-            'topic', 'requires_order', 'tables', 'hints', 'expected_output'
+            'topic', 'requires_order', 'tables', 'input_data', 'hints', 'expected_output', 'acceptance'
         ]
 
     def get_hints(self, obj):
@@ -183,19 +186,32 @@ class SQLProblemDetailSerializer(serializers.ModelSerializer):
         return False
 
     def get_expected_output(self, obj):
-        # Execute problem setup and solution SQL to retrieve expected output
+        # Load expected_output from metadata.json
         try:
-            base_path = os.path.join(settings.BASE_DIR, "problems", str(obj.problem_id).zfill(3))
-            ddl_path = os.path.join(base_path, "problem.sql")
-            solution_path = os.path.join(base_path, "solution.sql")
-
-            db_config = get_mysql_db_config()
-            with sandbox_schema(db_config) as (conn, cursor, schema):
-                run_problem_setup(cursor, ddl_path)
-                return get_solution_output(cursor, solution_path)
-
+            base_path = os.path.join(settings.BASE_DIR, "problems")
+            pattern = os.path.join(base_path, str(obj.problem_id).zfill(3), "metadata.json")
+            for meta_file in glob.glob(pattern):
+                with open(meta_file, "r", encoding="utf-8") as f:
+                    return json.load(f).get("expected_output", [])
         except Exception:
             return {"error": traceback.format_exc()}
+        
+    def get_acceptance(self, obj):
+        from sql_app.models import Attempt
+        total = Attempt.objects.filter(problem=obj).count()
+        correct = Attempt.objects.filter(problem=obj, status="Completed").count()
+        if total == 0:
+            return 0.0
+        return round(correct / total * 100, 2)
+    
+    def get_input_data(self, obj):
+        # Load input_data from metadata.json
+        base_path = os.path.join(settings.BASE_DIR, "problems")
+        pattern = os.path.join(base_path, str(obj.problem_id).zfill(3), "metadata.json")
+        for meta_file in glob.glob(pattern):
+            with open(meta_file, "r", encoding="utf-8") as f:
+                return json.load(f).get("input_data", [])
+        return
 
 class AttemptSerializer(serializers.ModelSerializer):
     """
@@ -277,3 +293,25 @@ class AttemptSerializer(serializers.ModelSerializer):
         # Store the check result (e.g., diff message) in serializer context
         self.context['check_result'] = message
         return attempt
+
+class AttemptHistorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for representing a user's attempt history on a specific problem.
+
+    This serializer is used to return a summary of past attempts, including:
+    - When the user submitted their answer
+    - Their score
+    - How much time they spent
+    - The result status (e.g., Completed, Failed)
+    - How many hints were used
+
+    Fields:
+        - submission_date (datetime): Timestamp of when the attempt was submitted.
+        - score (decimal): The score the user received for the attempt.
+        - time_taken (int): Time spent on the attempt, in seconds.
+        - status (str): Status of the attempt ('Completed', 'In Progress', etc.).
+        - hints_used (int): Number of hints used during the attempt.
+    """
+    class Meta:
+        model = Attempt
+        fields = ['submission_date', 'score', 'time_taken', 'status', 'hints_used']

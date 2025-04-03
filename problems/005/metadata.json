@@ -14,8 +14,21 @@
         ]
       }
     ],
+    "input_data": {
+      "orders": [
+        ["order_number", "customer_number"],
+        [1, 1],
+        [2, 2],
+        [3, 3],
+        [4, 3]
+      ]
+    },
     "hints": [
       "Use COUNT(*) to count the number of orders per customer.",
       "Use ORDER BY and LIMIT to get the customer with the most orders."
+    ],
+    "expected_output": [
+      ["customer_number"],
+      [3]
     ]
-  }
+}
