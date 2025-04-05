@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import SQLProblem, Attempt
+from .models import SQLProblem, Attempt, Topic
 from .serializers import SQLProblemListSerializer, SQLProblemDetailSerializer, AttemptSerializer, AttemptHistorySerializer
 from utils.sql_sandbox import check_user_query
 from rest_framework.permissions import IsAuthenticated
@@ -14,7 +14,7 @@ from django.db.models import Count, Case, When, IntegerField, FloatField, Expres
 @api_view(['GET'])
 def problem_list(request):
     """
-    Retrieves a list of all available SQL problems.
+    Retrieves a list of all available SQL problems, with optional filtering and annotated acceptance rates.
 
     This endpoint returns a simplified list of SQL problems, including:
     - Problem ID
@@ -28,28 +28,53 @@ def problem_list(request):
     Method: GET  
     URL: /api/problems/
 
+    Query Parameters:
+    - difficulty (str): Filter by difficulty level (e.g., Easy, Medium, Hard)
+    - topic (str): Filter by topic name (e.g., JOIN, Aggregation)
+
+    Features:
+    - Results are ordered by `problem_id` in ascending order
+    - Filtering is case-insensitive
+    - Acceptance rate is precomputed (Completed attempts / Total attempts)
+
+    Example:
+        GET /api/problems/?difficulty=Easy&topic=JOIN
+
     Response Example:
-        [
-            {
-                "problem_id": 1,
-                "title": "Find Top Seller",
-                "difficulty_level": "Medium",
-                "topic": "Aggregation",
-                "acceptance": 83.33
-            },
-            {
-                "problem_id": 2,
-                "title": "Employees Without Managers",
-                "difficulty_level": "Easy",
-                "topic": "JOIN",
-                "acceptance": 100.0
-            }
-        ]
+    [
+        {
+            "problem_id": 1,
+            "title": "Find Top Seller",
+            "difficulty_level": "Medium",
+            "topic": "Aggregation",
+            "acceptance": 83.33
+        },
+        {
+            "problem_id": 2,
+            "title": "Employees Without Managers",
+            "difficulty_level": "Easy",
+            "topic": "JOIN",
+            "acceptance": 100.0
+        }
+    ]
 
     Returns:
         Response: A JSON list of problems serialized via `SQLProblemListSerializer`.
     """
-    problems = SQLProblem.objects.annotate(
+    queryset = SQLProblem.objects.all()
+
+    # Get query params
+    difficulty = request.GET.get('difficulty')
+    topic = request.GET.get('topic')
+
+    if difficulty:
+        queryset = queryset.filter(difficulty_level__iexact=difficulty)
+
+    if topic:
+        queryset = queryset.filter(topic__name__iexact=topic)
+
+    # Annotate acceptance
+    queryset = queryset.annotate(
         total_attempts=Count("attempts"),
         successful_attempts=Count(
             Case(
@@ -60,7 +85,7 @@ def problem_list(request):
         raw_acceptance=ExpressionWrapper(
             Case(
                 When(total_attempts__gt=0,
-                    then=F('successful_attempts') * 100.0 / F('total_attempts')),
+                     then=F('successful_attempts') * 100.0 / F('total_attempts')),
                 default=Value(0.0),
                 output_field=FloatField()
             ),
@@ -69,7 +94,7 @@ def problem_list(request):
         acceptance=Func(F('raw_acceptance'), function='ROUND', template='ROUND(%(expressions)s, 2)')
     ).order_by('problem_id')
 
-    serializer = SQLProblemListSerializer(problems, many=True)
+    serializer = SQLProblemListSerializer(queryset, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -263,3 +288,28 @@ class AttemptHistoryView(APIView):
         attempts = Attempt.objects.filter(user=user, problem=problem).order_by('-submission_date')
         serializer = AttemptHistorySerializer(attempts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class ProblemFiltersView(APIView):
+    """
+    API endpoint for retrieving distinct filter options for SQL problems.
+
+    Method: GET  
+    URL: /api/problems/filters/
+
+    Purpose:
+    - Provides available topic names and difficulty levels for frontend filter dropdowns.
+
+    Returns:
+        200 OK with JSON object:
+        {
+            "topics": ["Aggregation", "Join", "Window Functions", ...],
+            "difficulty_levels": ["Easy", "Medium", "Hard", "Expert"]
+        }
+    """
+    def get(self, request):
+        topics = Topic.objects.values_list("name", flat=True).distinct()
+        difficulties = SQLProblem.objects.values_list("difficulty_level", flat=True).distinct()
+        return Response({
+            "topics": sorted(topics),
+            "difficulty_levels": sorted(difficulties)
+        }, status=status.HTTP_200_OK)
