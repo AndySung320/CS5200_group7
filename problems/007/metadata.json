@@ -15,9 +15,25 @@
         ]
       }
     ],
+    "input_data": {
+      "ActorDirector": [
+        ["actor_id", "director_id", "timestamp"],
+        [1, 1, 0],
+        [1, 1, 1],
+        [1, 1, 2],
+        [1, 2, 3],
+        [1, 2, 4],
+        [2, 1, 5],
+        [2, 1, 6]
+      ]
+    },
     "hints": [
       "Group the rows by actor_id and director_id.",
       "Use COUNT(*) to find how many times each pair appears.",
       "Use HAVING to filter only those pairs with 3 or more collaborations."
+    ],
+    "expected_output": [
+      ["actor_id", "director_id"],
+      [1, 1]
     ]
-  }
+}

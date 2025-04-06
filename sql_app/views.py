@@ -5,48 +5,102 @@ from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import SQLProblem
-from .serializers import SQLProblemListSerializer, SQLProblemDetailSerializer, AttemptSerializer
+from .models import SQLProblem, Attempt, Topic
+from .serializers import SQLProblemListSerializer, SQLProblemDetailSerializer, AttemptSerializer, AttemptHistorySerializer, ProblemUploadSerializer
 from utils.sql_sandbox import check_user_query
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Count, Case, When, IntegerField, FloatField, ExpressionWrapper, Value, F, Func
+
+import os, json
+from django.conf import settings
+from .permissions import IsAdminUserOrInstructor
+from django.db import connection
+from utils.save_sql_problem_to_db import save_sql_problem_to_db
 
 @api_view(['GET'])
 def problem_list(request):
     """
-    Retrieves a list of all available SQL problems.
+    Retrieves a list of all available SQL problems, with optional filtering and annotated acceptance rates.
 
     This endpoint returns a simplified list of SQL problems, including:
     - Problem ID
     - Title
     - Difficulty level
     - Topic name
+    - Acceptance rate (rounded to 2 decimal places)
 
     The data is ordered by `problem_id` in ascending order.
 
     Method: GET  
-    URL: /api/problems/
+    URL: /api/sql-problems/
+
+    Query Parameters:
+    - difficulty (str): Filter by difficulty level (e.g., Easy, Medium, Hard)
+    - topic (str): Filter by topic name (e.g., JOIN, Aggregation)
+
+    Features:
+    - Results are ordered by `problem_id` in ascending order
+    - Filtering is case-insensitive
+    - Acceptance rate is precomputed (Completed attempts / Total attempts)
+
+    Example:
+        GET /api/problems/?difficulty=Easy&topic=JOIN
 
     Response Example:
-        [
-            {
-                "problem_id": 1,
-                "title": "Find Top Seller",
-                "difficulty_level": "Medium",
-                "topic": "Aggregation"
-            },
-            {
-                "problem_id": 2,
-                "title": "Employees Without Managers",
-                "difficulty_level": "Easy",
-                "topic": "JOIN"
-            }
-        ]
+    [
+        {
+            "problem_id": 1,
+            "title": "Find Top Seller",
+            "difficulty_level": "Medium",
+            "topic": "Aggregation",
+            "acceptance": 83.33
+        },
+        {
+            "problem_id": 2,
+            "title": "Employees Without Managers",
+            "difficulty_level": "Easy",
+            "topic": "JOIN",
+            "acceptance": 100.0
+        }
+    ]
 
     Returns:
         Response: A JSON list of problems serialized via `SQLProblemListSerializer`.
     """
-    problems = SQLProblem.objects.all().order_by('problem_id')
-    serializer = SQLProblemListSerializer(problems, many=True)
+    queryset = SQLProblem.objects.all()
+
+    # Get query params
+    difficulty = request.GET.get('difficulty')
+    topic = request.GET.get('topic')
+
+    if difficulty:
+        queryset = queryset.filter(difficulty_level__iexact=difficulty)
+
+    if topic:
+        queryset = queryset.filter(topic__name__iexact=topic)
+
+    # Annotate acceptance
+    queryset = queryset.annotate(
+        total_attempts=Count("attempts"),
+        successful_attempts=Count(
+            Case(
+                When(attempts__status="Completed", then=1),
+                output_field=IntegerField()
+            )
+        ),
+        raw_acceptance=ExpressionWrapper(
+            Case(
+                When(total_attempts__gt=0,
+                     then=F('successful_attempts') * 100.0 / F('total_attempts')),
+                default=Value(0.0),
+                output_field=FloatField()
+            ),
+            output_field=FloatField()
+        ),
+        acceptance=Func(F('raw_acceptance'), function='ROUND', template='ROUND(%(expressions)s, 2)')
+    ).order_by('problem_id')
+
+    serializer = SQLProblemListSerializer(queryset, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -78,8 +132,10 @@ def problem_detail(request, problem_id):
                 "topic": "JOIN",
                 "requires_order": false,
                 "tables": [...],
+                "input_data",
                 "hints": [...],
-                "expected_output": [...]
+                "expected_output": [...],
+                "acceptance": value (float)
             }
 
         404 Not Found:
@@ -182,3 +238,183 @@ class AttemptSubmitView(APIView):
             "score": score,
             "feedback": message
         }, status=status.HTTP_200_OK)
+
+
+class AttemptHistoryView(APIView):
+    """
+    API endpoint to retrieve a user's submission history for a specific SQL problem.
+
+    Method:
+        GET
+
+    URL:
+        /api/problems/<problem_id>/history/
+
+    Permissions:
+        - Requires authentication (JWT token)
+
+    Request Parameters:
+        - problem_id (int): The ID of the SQL problem
+
+    Behavior:
+        - Checks if the problem exists
+        - Retrieves all attempts made by the current user for the specified problem
+        - Orders attempts by submission date (most recent first)
+
+    Response (200 OK):
+        Returns a list of attempt records with the following fields:
+        [
+            {
+                "submission_date": "2024-04-01T14:32:00Z",
+                "score": 100.0,
+                "time_taken": 120,
+                "status": "Completed",
+                "hints_used": 1
+            },
+            ...
+        ]
+
+    Response (404 Not Found):
+        {
+            "error": "Problem not found"
+        }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, problem_id):
+        user = request.user
+
+        # Check if the problem exists
+        try:
+            problem = SQLProblem.objects.get(problem_id=problem_id)
+        except SQLProblem.DoesNotExist:
+            return Response({"error": "Problem not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Retrieve the user's submission history for this problem (ordered by most recent)
+        attempts = Attempt.objects.filter(user=user, problem=problem).order_by('-submission_date')
+        serializer = AttemptHistorySerializer(attempts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class ProblemFiltersView(APIView):
+    """
+    API endpoint for retrieving distinct filter options for SQL problems.
+
+    Method: GET  
+    URL: /api/problems/filters/
+
+    Purpose:
+    - Provides available topic names and difficulty levels for frontend filter dropdowns.
+
+    Returns:
+        200 OK with JSON object:
+        {
+            "topics": ["Aggregation", "Join", "Window Functions", ...],
+            "difficulty_levels": ["Easy", "Medium", "Hard", "Expert"]
+        }
+    """
+    def get(self, request):
+        topics = Topic.objects.values_list("name", flat=True).distinct()
+        difficulties = SQLProblem.objects.values_list("difficulty_level", flat=True).distinct()
+        return Response({
+            "topics": sorted(topics),
+            "difficulty_levels": sorted(difficulties)
+        }, status=status.HTTP_200_OK)
+
+class UploadSQLProblemView(APIView):
+    """
+    API endpoint for uploading a new SQL problem to the platform.
+
+    Permission:
+        - Requires authentication (`IsAuthenticated`)
+        - Only accessible to users with role: Admin or Instructor (`IsAdminUserOrInstructor`)
+
+    Request Method:
+        POST
+
+    Request Headers:
+        Authorization: Bearer <access_token>  # Required for JWT authentication
+
+    Request Body (multipart/form-data):
+        - metadata (JSON string):
+            A JSON string that includes:
+                - title (str): The name of the SQL problem.
+                - description (str): A detailed description of the problem statement.
+                - difficulty_level (str): One of ['Easy', 'Medium', 'Hard', 'Expert'].
+                - topic_id (int): ID referencing the related topic (foreign key).
+                - requires_order (bool): Whether the result order should be considered in output comparison.
+                - tables (list): A list of table schema definitions for the problem.
+                - input_data (dict): The initial table data for the problem (for UI display or debugging).
+                - hints (list): A list of string hints associated with the problem.
+                - expected_output (list): The expected result rows (as dicts) from executing the solution query.
+        
+        *** Note: Do NOT include `problem_id` in the metadata. ***
+        It will be automatically generated by the server upon upload.
+
+        - problem_file (file): A `.sql` file containing DDL + sample data (CREATE + INSERT)
+        - solution_file (file): A `.sql` file containing the correct SELECT query
+
+    Process:
+        1. Validates the metadata and uploaded files.
+        2. Generates a new unique problem_id based on existing folders.
+        3. Creates a new subdirectory under `problems/{id}/` to store:
+            - metadata.json
+            - problem.sql
+            - solution.sql
+        4. Inserts the metadata and hints into the SQLProblem and Hint tables via raw SQL.
+
+    Returns:
+        - 201 Created: Problem uploaded successfully
+        - 400 Bad Request: Invalid data or duplicate problem ID folder
+        - 500 Internal Server Error: Unexpected error during processing
+
+    Example Response (Success):
+        {
+            "message": "Problem 004 uploaded successfully."
+        }
+
+    Notes:
+        - This endpoint is designed for backend/admin use to populate the SQL practice problem set.
+        - It assumes the database schema already exists and model `managed = False`.
+    """
+    permission_classes = [IsAuthenticated, IsAdminUserOrInstructor]
+
+    def post(self, request):
+        serializer = ProblemUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        metadata = serializer.get_validated_metadata()
+
+        try:
+            # Generate new problem_id
+            problems_root = os.path.join(settings.BASE_DIR, "problems")
+            existing_ids = [int(name) for name in os.listdir(problems_root) if name.isdigit()]
+            new_id = max(existing_ids, default=0) + 1
+            problem_dir = os.path.join(problems_root, f"{new_id:03d}")
+
+            # Check for duplicates
+            if os.path.exists(problem_dir):
+                return Response({"error": f"Problem {new_id} already exists."}, status=400)
+
+            os.makedirs(problem_dir)
+
+            # Update metadata and write
+            metadata_with_id = {"problem_id": new_id, **metadata}
+            with open(os.path.join(problem_dir, "metadata.json"), "w", encoding="utf-8") as f:
+                json.dump(metadata_with_id, f, indent=2)
+
+            # Write problem.sql
+            with open(os.path.join(problem_dir, "problem.sql"), "wb") as f:
+                f.write(request.FILES["problem_file"].read())
+
+            # Write solution.sql
+            with open(os.path.join(problem_dir, "solution.sql"), "wb") as f:
+                f.write(request.FILES["solution_file"].read())
+
+            with connection.cursor() as cursor:
+                            save_sql_problem_to_db(cursor, metadata_with_id)
+
+            return Response({"message": f"Problem {new_id} uploaded successfully."}, status=201)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)

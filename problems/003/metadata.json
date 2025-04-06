@@ -15,8 +15,23 @@
         ]
       }
     ],
+    "input_data": {
+      "Students": [
+        ["student_id", "student_name", "major"],
+        [1, "Daniel", "MSCS"],
+        [2, "Alice", ""],
+        [3, "Bob", "BSCS"],
+        [4, "George", "MSEE-CE"],
+        [5, "Alain", "MSCS"]
+      ]
+    },
     "hints": [
-        "The pattern 'MS%' matches any text that begins with 'MS'."
+      "The pattern 'MS%' matches any text that begins with 'MS'."
+    ],
+    "expected_output": [
+      ["student_id", "student_name"],
+      [1, "Daniel"],
+      [5, "Alain"]
     ]
-  }
+}
   
