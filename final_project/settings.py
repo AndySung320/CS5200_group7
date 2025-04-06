@@ -33,7 +33,7 @@ ENVIRONMENT = os.environ.get('DJANGO_ENV')
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Hosts allowed to access the server
-ALLOWED_HOSTS = ["*"] if DEBUG else ["https://db-group7-451621.uw.r.appspot.com/", "https://main.dz7dhpwoo2vvg.amplifyapp.com/"]
+ALLOWED_HOSTS = ["*"] if DEBUG else ["https://db-group7-451621.uw.r.appspot.com", "https://main.dz7dhpwoo2vvg.amplifyapp.com"]
 
 # Django REST Framework and JWT settings
 REST_FRAMEWORK = {
@@ -177,7 +177,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Allow cross-origin requests from frontend (e.g., React at port 3000)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://main.dz7dhpwoo2vvg.amplifyapp.com/",
+    "https://main.dz7dhpwoo2vvg.amplifyapp.com",
 ]
 
 # Allow cookies (for session-based auth if needed)
