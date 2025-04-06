@@ -107,7 +107,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         #
         # IMPORTANT: Always include both settings when working with externally managed tables
         # to avoid migration conflicts, accidental table creation, or schema mismatches.
-        db_table = "user"
+        db_table = "User"
         managed = False
     
     def __str__(self):

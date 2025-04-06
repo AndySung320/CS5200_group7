@@ -16,10 +16,24 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
+
+def home_view(request):
+    return JsonResponse({"message": "Welcome to the SQL Learning Platform API"})
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('', include('group7_app.urls')),   # home page
-    path('api/auth/', include('users.urls')),   # register、login、token
-    path('api/', include('sql_app.urls'))
+    
+    # Root route now handled by group7_app
+    path("", include("group7_app.urls")),
+
+    # API routes
+    path("api/auth/", include("users.urls")),
+    path("api/messages/", include("messages.urls")),
+    path("api/notifications/", include("notifications.urls")),
+    path("api/comments/", include("comments.urls")),
+    path("api/badges/", include("badges.urls")),
+    path("api/admin/", include("admin_tools.urls")),
+    path("api/analytics/", include("analytics.urls")),
+    path("api/", include("sql_app.urls")),
 ]
