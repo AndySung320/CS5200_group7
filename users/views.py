@@ -65,11 +65,13 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
     Successful Response:
         {
-            "refresh": "<refresh_token>",
-            "access": "<access_token>",
-            "user_id": 1,
+            "refresh": "<token>",
+            "access": "<token>",
+            "user_id": 3,
             "name": "Thomas",
-            "role": "Student"
+            "role": "Student",
+            "email": "thomas@example.com",
+            "profile_info": "I love SQL and biophysics."
         }
 
     This enhanced response allows frontend applications to retrieve key user info
