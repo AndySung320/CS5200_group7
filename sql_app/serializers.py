@@ -6,6 +6,7 @@ import os, glob, json
 from utils.sql_sandbox import run_problem_setup, get_solution_output, sandbox_schema, check_user_query
 from config.db_config import get_mysql_db_config
 import traceback
+import re
 
 class SQLProblemListSerializer(serializers.ModelSerializer):
     """
@@ -315,3 +316,71 @@ class AttemptHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Attempt
         fields = ['submission_date', 'score', 'time_taken', 'status', 'hints_used']
+
+REQUIRED_METADATA_FIELDS = {
+    "title": str,
+    "description": str,
+    "difficulty_level": str,
+    "topic_id": int,
+    "requires_order": bool,
+    "tables": list,
+    "input_data": dict,
+    "hints": list,
+    "expected_output": list
+}
+
+import re
+
+FORBIDDEN_IN_SOLUTION = [r"\bDROP\s+TABLE\b", r"\bDROP\s+DATABASE\b"]
+FORBIDDEN_IN_PROBLEM = [r"\bDROP\s+DATABASE\b"]
+
+class ProblemUploadSerializer(serializers.Serializer):
+    metadata_file = serializers.FileField()
+    problem_file = serializers.FileField()
+    solution_file = serializers.FileField()
+
+    def validate_metadata_file(self, file):
+        try:
+            metadata = json.load(file)
+        except json.JSONDecodeError:
+            raise serializers.ValidationError("Invalid JSON format in metadata_file.")
+
+        for field, expected_type in REQUIRED_METADATA_FIELDS.items():
+            if field not in metadata:
+                raise serializers.ValidationError(f"Missing required field: {field}")
+            if not isinstance(metadata[field], expected_type):
+                raise serializers.ValidationError(
+                    f"Field '{field}' must be of type {expected_type.__name__}."
+                )
+
+        self._validated_metadata = metadata
+        return file
+
+    def validate_problem_file(self, file):
+        if not file.name.endswith(".sql"):
+            raise serializers.ValidationError("problem_file must be a .sql file.")
+
+        content = file.read().decode("utf-8")
+        file.seek(0)  # reset for saving later
+
+        for pattern in FORBIDDEN_IN_PROBLEM:
+            if re.search(pattern, content, flags=re.IGNORECASE):
+                raise serializers.ValidationError(f"Forbidden SQL found in problem_file: {pattern}")
+
+        return file
+
+    def validate_solution_file(self, file):
+        if not file.name.endswith(".sql"):
+            raise serializers.ValidationError("solution_file must be a .sql file.")
+
+        content = file.read().decode("utf-8")
+        file.seek(0)  # reset for saving later
+
+        for pattern in FORBIDDEN_IN_SOLUTION:
+            if re.search(pattern, content, flags=re.IGNORECASE):
+                raise serializers.ValidationError(f"Forbidden SQL found in solution_file: {pattern}")
+
+        return file
+
+    def get_validated_metadata(self):
+        return self._validated_metadata
