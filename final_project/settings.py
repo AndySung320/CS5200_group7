@@ -33,7 +33,7 @@ ENVIRONMENT = os.environ.get('DJANGO_ENV')
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Hosts allowed to access the server
-ALLOWED_HOSTS = ["*"] if DEBUG else ["https://db-group7-451621.uw.r.appspot.com", "https://main.dz7dhpwoo2vvg.amplifyapp.com"]
+ALLOWED_HOSTS = ["*"] if DEBUG else ["db-group7-451621.uw.r.appspot.com", "main.dz7dhpwoo2vvg.amplifyapp.com", "localhost"]
 
 # Django REST Framework and JWT settings
 REST_FRAMEWORK = {
