@@ -153,7 +153,7 @@ class Attempt(models.Model):
     """
     attempt_id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, db_column='user_id', on_delete=models.CASCADE)
-    problem = models.ForeignKey(SQLProblem, db_column='problem_id', on_delete=models.CASCADE)
+    problem = models.ForeignKey(SQLProblem, db_column='problem_id', on_delete=models.CASCADE, related_name='attempts')
     submission_date = models.DateTimeField(auto_now_add=True)
     score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     time_taken = models.IntegerField(null=True, blank=True, help_text="Time taken in seconds")

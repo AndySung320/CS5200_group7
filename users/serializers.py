@@ -83,7 +83,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         "access": "<token>",
         "user_id": 3,
         "name": "Thomas",
-        "role": "Student"
+        "role": "Student",
+        "email": "thomas@example.com",
+        "profile_info": "I love SQL and biophysics."
     }
     """
     @classmethod
@@ -99,4 +101,69 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['user_id'] = self.user.user_id
         data['name'] = self.user.name
         data['role'] = self.user.role
+        data['email'] = self.user.email
+        data['profile_info'] = self.user.profile_info
         return data
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for updating user profile information, including optional password change.
+
+    Features:
+    - Allows users to update their name, profile_info, and optionally change their password.
+    - Supports password confirmation through the `verify_password` field.
+    - Validates that both password fields match before allowing update.
+    - Automatically hashes the password before saving using `set_password`.
+    - Excludes `verify_password` from the actual database update, as it's used only for validation.
+
+    Fields:
+        name (str): Updated display name of the user.
+        profile_info (str): Additional user profile details.
+        password (str, write-only, optional): New password to be set.
+        verify_password (str, write-only, optional): Confirmation field that must match the password.
+
+    Example Input:
+        {
+            "name": "Updated Name",
+            "profile_info": "I like SQL.",
+            "password": "newpassword123",
+            "verify_password": "newpassword123"
+        }
+
+    Example Output:
+        {
+            "name": "Updated Name",
+            "profile_info": "I like SQL."
+        }
+
+    Notes:
+    - If `password` and `verify_password` are omitted, the password remains unchanged.
+    - Passwords must match if either field is provided.
+    - `verify_password` is only used for validation and will not be stored.
+    """
+    password = serializers.CharField(write_only=True, required=False)
+    verify_password = serializers.CharField(write_only=True, required=False)
+    
+    class Meta:
+        model = User
+        fields = ['name', 'profile_info', 'password', 'verify_password']
+
+    def validate(self, data):
+        password = data.get('password')
+        verify = data.get('verify_password')
+        # Ensure that if either password field is provided, both must match
+        if password or verify:
+            if password != verify:
+                raise serializers.ValidationError("Passwords do not match.")
+        return data
+
+    def update(self, instance, validated_data):
+        # Remove 'verify_password' from data since it's not stored
+        validated_data.pop('verify_password', None)
+
+        # If a password is provided, hash it before saving
+        if 'password' in validated_data:
+            instance.set_password(validated_data.pop('password'))
+            
+        # Continue with the standard update for other fields
+        return super().update(instance, validated_data)

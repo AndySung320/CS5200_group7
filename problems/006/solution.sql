@@ -3,15 +3,15 @@ SELECT
     product_id,
     sales
 FROM
-    sales AS s
+    Sales AS s
 WHERE
     product_id = (
         SELECT product_id
-        FROM sales
+        FROM Sales
         WHERE employee_id = s.employee_id
-        AND sales = (
+        AND Sales = (
             SELECT MAX(sales)
-            FROM sales
+            FROM Sales
             WHERE employee_id = s.employee_id
         )
         ORDER BY product_id ASC

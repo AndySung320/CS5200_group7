@@ -15,9 +15,27 @@
         ]
       }
     ],
+    "input_data": {
+      "Sales": [
+        ["employee_id", "product_id", "sales"],
+        [2, 2, 95],
+        [2, 3, 95],
+        [1, 1, 90],
+        [1, 2, 99],
+        [3, 1, 80],
+        [3, 2, 82],
+        [3, 3, 82]
+      ]
+    },
     "hints": [
       "Use ROW_NUMBER() or RANK() with PARTITION BY employee_id to identify the top sales record per employee.",
       "Sort ties by product_id to get the smallest one in case of equal sales.",
       "Use a CTE or subquery to filter the top-ranked row for each employee."
+    ],
+    "expected_output": [
+      ["employee_id", "product_id", "sales"],
+      [1, 2, 99],
+      [2, 2, 95],
+      [3, 2, 82]
     ]
-  }
+}
