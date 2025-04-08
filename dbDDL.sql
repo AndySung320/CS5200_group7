@@ -96,7 +96,7 @@ CREATE TABLE Message (
     FOREIGN KEY (sender_id) REFERENCES User(user_id) ON DELETE CASCADE,
     FOREIGN KEY (receiver_id) REFERENCES User(user_id) ON DELETE CASCADE,
     INDEX idx_sender (sender_id),
-    INDEX idx_receiver (receiver_id)
+    INDEX idx_receiver (recetoken_idiver_id)
 );
 
 -- Notification table
@@ -154,7 +154,10 @@ CREATE TABLE StudentBadge (
     PRIMARY KEY (student_id, badge_id),
     FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
     FOREIGN KEY (badge_id) REFERENCES Badge(badge_id) ON DELETE CASCADE
+    
 );
+
+
 
 -- Create a user index table for tracking user count
 CREATE TABLE UserIndex (
