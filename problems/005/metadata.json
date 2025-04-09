@@ -7,7 +7,7 @@
     "requires_order": false,
     "tables": [
       {
-        "table_name": "orders",
+        "table_name": "Orders",
         "columns": [
           { "name": "order_number", "type": "int", "description": "Order ID" },
           { "name": "customer_number", "type": "int", "description": "Customer ID who placed the order" }
@@ -15,7 +15,7 @@
       }
     ],
     "input_data": {
-      "orders": [
+      "Orders": [
         ["order_number", "customer_number"],
         [1, 1],
         [2, 2],

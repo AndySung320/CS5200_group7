@@ -11,6 +11,10 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+class Meta:
+    db_table = "Notification"
+    managed = False
+    
     def __str__(self):
         # Display first 20 characters of the message
         return f"Notification for {self.user.username}: {self.message[:20]}"
