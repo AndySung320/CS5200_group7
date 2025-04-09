@@ -384,3 +384,24 @@ class ProblemUploadSerializer(serializers.Serializer):
 
     def get_validated_metadata(self):
         return self._validated_metadata
+
+class SQLQuerySerializer(serializers.Serializer):
+    """
+    Serializer for validating instructor-submitted SQL query input.
+
+    Fields:
+        query (str):
+            - Required
+            - Max length: 5000 characters
+            - Represents a raw SQL query (must be SELECT/WITH type)
+    
+    Purpose:
+        - Used in InstructorQueryAPIView to validate query input before execution.
+        - Helps enforce that the query is present and does not exceed length limits.
+
+    Notes:
+        - This serializer does not validate SQL safety (e.g. forbidden keywords);
+          that logic is handled separately in the view.
+        - Designed to support future expansion (e.g. optional 'limit', 'table', etc.)
+    """
+    query = serializers.CharField(required=True, max_length=5000)

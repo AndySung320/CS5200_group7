@@ -6,7 +6,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import SQLProblem, Attempt, Topic
-from .serializers import SQLProblemListSerializer, SQLProblemDetailSerializer, AttemptSerializer, AttemptHistorySerializer, ProblemUploadSerializer
+from .serializers import SQLProblemListSerializer, SQLProblemDetailSerializer, AttemptSerializer, AttemptHistorySerializer 
+from .serializers import ProblemUploadSerializer, SQLQuerySerializer
 from utils.sql_sandbox import check_user_query
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Case, When, IntegerField, FloatField, ExpressionWrapper, Value, F, Func
@@ -418,3 +419,176 @@ class UploadSQLProblemView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+
+class InstructorQueryAPIView(APIView):
+    """
+    API endpoint for instructors to execute SQL queries 
+    and retrieve data related to student performance.
+
+    Permissions:
+        - Requires authentication (`IsAuthenticated`)
+        - Requires user role: 'Instructor' or 'Admin' (`IsAdminUserOrInstructor`)
+
+    Accepted Query Types:
+        - Only SELECT or WITH queries are allowed.
+        - Queries must NOT contain forbidden keywords:
+            DROP, DELETE, INSERT, UPDATE, ALTER, CREATE
+        - Returned result columns must all be in the allowed whitelist.
+    """
+    permission_classes = [IsAuthenticated, IsAdminUserOrInstructor]
+    ALLOWED_COLUMNS = {
+        "User": ["user_id", "name", "email", "role", "date_joined"],
+        "SQLProblem": ["problem_id", "title", "difficulty_level", "topic_id"],
+        "Attempt": ["user_id", "problem_id", "score", "status", "time_taken", "submission_date"],
+        "Topic": ["topic_id", "name"]
+    }
+
+    def are_selected_columns_allowed(self, columns, ALLOWED_COLUMNS):
+        """
+        Check if all selected columns are within the allowed whitelist.
+
+        Args:
+            columns (List[str]): Columns returned by the SQL query.
+            ALLOWED_COLUMNS (Dict[str, List[str]]): Mapping of allowed columns by table.
+
+        Returns:
+            bool: True if all columns are allowed; False otherwise.
+        """
+        allowed_fields = set()
+        for fields in ALLOWED_COLUMNS.values():
+            allowed_fields.update(fields)
+
+        return all(col in allowed_fields for col in columns)
+    
+    def post(self, request):
+        """
+        POST /instructor/query-sql/
+
+        Accepts a SQL SELECT query and returns the query result if valid.
+
+        Request Body (application/json):
+            {
+                "query": "<SQL SELECT statement>"
+            }
+
+        Response:
+            200 OK:
+                {
+                    "columns": ["col1", "col2", ...],
+                    "rows": [[val1, val2], [val3, val4], ...]
+                }
+            400 Bad Request:
+                {
+                    "error": "Validation or execution error message"
+                }
+            403 Forbidden:
+                {
+                    "error": "Some columns are not allowed."
+                }
+        """
+        serializer = SQLQuerySerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        query = serializer.validated_data["query"]
+
+        if not self.is_safe_query(query):
+            return Response({"error": "Only safe SELECT queries are allowed."}, status=400)
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(query)
+                columns = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+            if not self.are_selected_columns_allowed(columns, self.ALLOWED_COLUMNS):
+                return Response({"error": "Some columns are not allowed."}, status=403)
+            return Response({"columns": columns, "rows": rows}, status=200)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+        
+    def is_safe_query(self, query):
+        """
+        Check if the query starts with SELECT or WITH 
+        and contains no forbidden keywords.
+
+        Args:
+            query (str): SQL query string submitted by the instructor.
+
+        Returns:
+            bool: True if query is considered safe, False otherwise.
+        """
+        safe_starts = ["select", "with"]
+        forbidden = ["drop", "delete", "insert", "update", "alter", "create"]
+
+        query_lower = query.lower().strip()
+        
+        return (
+            any(query_lower.startswith(start) for start in safe_starts)
+            and not any(f in query_lower for f in forbidden)
+        )
+
+class AllowedSchemaAPIView(APIView):
+    """
+    API endpoint that returns the list of allowed tables and their column definitions
+    for use in instructor SQL queries.
+
+    Permissions:
+        - Requires authentication (`IsAuthenticated`)
+        - Requires user role: 'Instructor' or 'Admin' (`IsAdminUserOrInstructor`)
+
+    Purpose:
+        - Provides the front-end (or client) with metadata about which tables and columns
+          are permitted in SQL query execution by instructors.
+
+    Response Format:
+        200 OK:
+        {
+            "User": [
+                {"name": "user_id", "type": "int"},
+                {"name": "name", "type": "varchar"},
+                ...
+            ],
+            "Attempt": [
+                {"name": "user_id", "type": "int"},
+                {"name": "problem_id", "type": "int"},
+                ...
+            ],
+            ...
+        }
+
+    Notes:
+        - This schema is based on a static whitelist and is not dynamically generated.
+        - It should match the back-end's `ALLOWED_COLUMNS` used for query validation.
+    """
+    permission_classes = [IsAuthenticated, IsAdminUserOrInstructor]
+
+    def get(self, request):
+        schema = {
+            "User": [
+                {"name": "user_id", "type": "int"},
+                {"name": "name", "type": "varchar"},
+                {"name": "email", "type": "varchar"},
+                {"name": "role", "type": "enum"},
+                {"name": "date_joined", "type": "datetime"}
+            ],
+            "SQLProblem": [
+                {"name": "problem_id", "type": "int"},
+                {"name": "title", "type": "varchar"},
+                {"name": "difficulty_level", "type": "enum"},
+                {"name": "topic_id", "type": "int"}
+            ],
+            "Attempt": [
+                {"name": "user_id", "type": "int"},
+                {"name": "problem_id", "type": "int"},
+                {"name": "score", "type": "decimal"},
+                {"name": "status", "type": "enum"},
+                {"name": "time_taken", "type": "int"},
+                {"name": "submission_date", "type": "datetime"}
+            ],
+            "Topic": [
+                {"name": "topic_id", "type": "int"},
+                {"name": "name", "type": "varchar"}
+            ]
+        }
+        return Response(schema)
