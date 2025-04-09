@@ -15,31 +15,34 @@ from dotenv import load_dotenv
 import os
 from datetime import timedelta
 
+# Load environment variables from .env file (if it exists)
 load_dotenv()
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+
+# Base directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'your-default-secret-key')
+
+# Set environment (used for switching DB or config)
 ENVIRONMENT = os.environ.get('DJANGO_ENV')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ["*"] if DEBUG else ["your-production-domain.com"]
+# Hosts allowed to access the server
+ALLOWED_HOSTS = ["*"] if DEBUG else ["https://db-group7-451621.uw.r.appspot.com/", "https://main.dz7dhpwoo2vvg.amplifyapp.com/"]
 
-
-# Application definition
-
+# Django REST Framework and JWT settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
 
+# Simple JWT token settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -47,30 +50,47 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_BLACKLIST_ENABLED': True,
-    
+
     # Tells SimpleJWT to use the custom field 'user_id' as the user identifier.
     # By default, it uses 'id', but our User model defines 'user_id' as the primary key.
     'USER_ID_FIELD': 'user_id'
 }
 
+# Applications installed in this Django project
 INSTALLED_APPS = [
+    # Default Django apps
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'group7_app.apps.Group7AppConfig',
-    'users.apps.UsersConfig',
-    'rest_framework',
-    'rest_framework_simplejwt.token_blacklist',
-    'corsheaders',
-    'sql_app.apps.SqlAppConfig',
+
+    # Your main app
+    "group7_app.apps.Group7AppConfig",
+
+    # Third-party packages
+    "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "corsheaders",
+
+    # Custom Django apps
+    "users.apps.UsersConfig",
+    "messages.apps.MessagesConfig",
+    "notifications",
+    "comments",
+    "badges",
+    "admin_tools",
+    "analytics",
+    "sql_app.apps.SqlAppConfig",
 ]
+
+# Custom User model path
 AUTH_USER_MODEL = 'users.User'
 
+# Middleware components for request/response lifecycle
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # Enables CORS
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -80,15 +100,10 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # React frontend
-]
-
-# If using cookies/sessions for auth
-CORS_ALLOW_CREDENTIALS = True
-
+# Root URL configuration
 ROOT_URLCONF = "final_project.urls"
 
+# Template engine configuration
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -105,12 +120,10 @@ TEMPLATES = [
     },
 ]
 
+# WSGI entry point for deployment
 WSGI_APPLICATION = "final_project.wsgi.application"
 
-
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
+# Database configuration (MySQL used here)if ENVIRONMENT == "production":
 if ENVIRONMENT == "production":
     DATABASES = {
         "default": {
@@ -141,38 +154,31 @@ else:
         }
     }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
-
+# Password validation rules
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",},
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
-
+# Localization settings
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
+# Static file URL prefix
 STATIC_URL = "static/"
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
-
+# Default field type for model primary keys
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Allow cross-origin requests from frontend (e.g., React at port 3000)
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://main.dz7dhpwoo2vvg.amplifyapp.com/",
+]
+
+# Allow cookies (for session-based auth if needed)
+CORS_ALLOW_CREDENTIALS = True
