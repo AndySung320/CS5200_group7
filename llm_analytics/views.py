@@ -19,18 +19,42 @@ def generate_read_query(request):
 
 
 def call_llm_for_read_query(prompt):
-    system_prompt = (
-        "You are a SQL assistant that only generates SELECT queries. "
-        "Do NOT provide INSERT, UPDATE, DELETE or DDL statements. "
-        "If the user asks for anything other than reading data, respond with a warning."
-    )
+    schema_knowledge = """
+You can only query the following Django models represented as SQL tables:
+
+1. **User**
+   - user_id (int)
+   - name (str)
+
+2. **SQLProblem**
+   - problem_id (int)
+   - title (str)
+   - difficulty_level (str)
+   - topic_id (int)
+
+3. **Attempt**
+   - attempt_id (int)
+   - user_id (int) - ForeignKey to User
+   - problem_id (int) - ForeignKey to SQLProblem
+   - score (float)
+   - status (str)
+   - submission_date (datetime)
+   - time_taken (float, in seconds)
+   - hints_used (int)
+
+Rules:
+- Only generate SELECT queries using these fields and tables.
+- Do NOT generate INSERT, UPDATE, DELETE, or DDL statements.
+- If asked for anything outside the schema or write operations, reply with a warning.
+"""
+
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": schema_knowledge},
             {"role": "user", "content": prompt}
         ],
         temperature=0.2,
-        max_tokens=150
+        max_tokens=200
     )
     return response.choices[0].message.content.strip()
