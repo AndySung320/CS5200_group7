@@ -17,6 +17,7 @@ from django.conf import settings
 from .permissions import IsAdminUserOrInstructor
 from django.db import connection
 from utils.save_sql_problem_to_db import save_sql_problem_to_db
+from sqlglot import parse_one, exp
 
 @api_view(['GET'])
 def problem_list(request):
@@ -439,26 +440,73 @@ class InstructorQueryAPIView(APIView):
     ALLOWED_COLUMNS = {
         "User": ["user_id", "name", "email", "role", "date_joined"],
         "SQLProblem": ["problem_id", "title", "difficulty_level", "topic_id"],
-        "Attempt": ["user_id", "problem_id", "score", "status", "time_taken", "submission_date"],
+        "Attempt": ["attempt_id", "user_id", "problem_id", "score", "status", "time_taken", "submission_date", "hint_used"],
         "Topic": ["topic_id", "name"]
     }
 
-    def are_selected_columns_allowed(self, columns, ALLOWED_COLUMNS):
+    def are_selected_columns_allowed(self, query: str, ALLOWED_COLUMNS: dict) -> bool:
         """
-        Check if all selected columns are within the allowed whitelist.
+        Check if all columns used in the SQL query are within the allowed whitelist,
+        using SQL parser to support aliases (AS), JOINs, subqueries, and CTEs.
 
         Args:
-            columns (List[str]): Columns returned by the SQL query.
-            ALLOWED_COLUMNS (Dict[str, List[str]]): Mapping of allowed columns by table.
+            query (str): The raw SQL query string submitted by the instructor.
+            ALLOWED_COLUMNS (Dict[str, List[str]]): A mapping of allowed columns per table.
 
         Returns:
-            bool: True if all columns are allowed; False otherwise.
+            bool: True if all original columns used in the query are allowed; False otherwise.
         """
-        allowed_fields = set()
-        for fields in ALLOWED_COLUMNS.values():
-            allowed_fields.update(fields)
-
-        return all(col in allowed_fields for col in columns)
+        try:
+            parsed = parse_one(query)
+            
+            # Get all tables referenced in the query
+            referenced_tables = set()
+            for table_ref in parsed.find_all(exp.Table):
+                referenced_tables.add(table_ref.name)
+            
+            # 1. Process SELECT * or table.*
+            for star in parsed.find_all(exp.Star):
+                parent = star.parent
+                if isinstance(parent, exp.Select) or isinstance(parent, exp.Alias):
+                    table_node = parent.args.get("this")
+                    if table_node:  # Like User.*
+                        table_name = table_node.name
+                        if table_name not in ALLOWED_COLUMNS:
+                            return False
+                        return False  # Reject table.* syntax for safety
+                    else:
+                        return False  # Reject plain SELECT * syntax for safety
+            
+            # 2. Process SELECT specific columns
+            used_columns = set()
+            for col in parsed.find_all(exp.Column):
+                if col.name != "*":
+                    if col.table:
+                        col_identifier = f"{col.table}.{col.name}"
+                        used_columns.add(col_identifier)
+                        
+                        # Check if this specific column is allowed
+                        if col.table in ALLOWED_COLUMNS and col.name in ALLOWED_COLUMNS[col.table]:
+                            continue
+                        else:
+                            return False
+                    else:
+                        # For columns without explicit table, check if they exist in any allowed table
+                        col_found = False
+                        for table in referenced_tables:
+                            if table in ALLOWED_COLUMNS and col.name in ALLOWED_COLUMNS[table]:
+                                col_found = True
+                                break
+                        
+                        if not col_found:
+                            return False
+            
+            return True
+        
+        except Exception as e:
+            # If we can't parse the query, reject it
+            print(f"Error parsing SQL query: {e}")
+            return False
     
     def post(self, request):
         """
@@ -494,14 +542,16 @@ class InstructorQueryAPIView(APIView):
 
         if not self.is_safe_query(query):
             return Response({"error": "Only safe SELECT queries are allowed."}, status=400)
-
+        
+        if not self.are_selected_columns_allowed(query, self.ALLOWED_COLUMNS):
+            return Response({"error": "Some columns are not allowed."}, status=403)
         try:
             with connection.cursor() as cursor:
                 cursor.execute(query)
                 columns = [col[0] for col in cursor.description]
                 rows = cursor.fetchall()
-            if not self.are_selected_columns_allowed(columns, self.ALLOWED_COLUMNS):
-                return Response({"error": "Some columns are not allowed."}, status=403)
+            # if not self.are_selected_columns_allowed(columns, self.ALLOWED_COLUMNS):
+            #     return Response({"error": "Some columns are not allowed."}, status=403)
             return Response({"columns": columns, "rows": rows}, status=200)
 
         except Exception as e:
@@ -569,20 +619,20 @@ class AllowedSchemaAPIView(APIView):
                 {"name": "user_id", "type": "int"},
                 {"name": "name", "type": "varchar"},
                 {"name": "email", "type": "varchar"},
-                {"name": "role", "type": "enum"},
+                {"name": "role", "type": "enum('Student', 'Instructor', 'Admin')"},
                 {"name": "date_joined", "type": "datetime"}
             ],
             "SQLProblem": [
                 {"name": "problem_id", "type": "int"},
                 {"name": "title", "type": "varchar"},
-                {"name": "difficulty_level", "type": "enum"},
+                {"name": "difficulty_level", "type": "enum('Easy', 'Medium', 'Hard', 'Expert')"},
                 {"name": "topic_id", "type": "int"}
             ],
             "Attempt": [
                 {"name": "user_id", "type": "int"},
                 {"name": "problem_id", "type": "int"},
                 {"name": "score", "type": "decimal"},
-                {"name": "status", "type": "enum"},
+                {"name": "status", "type": "enum('Completed', 'Failed')"},
                 {"name": "time_taken", "type": "int"},
                 {"name": "submission_date", "type": "datetime"}
             ],
