@@ -83,6 +83,8 @@ INSTALLED_APPS = [
     "admin_tools",
     "analytics",
     "sql_app.apps.SqlAppConfig",
+    "schema",
+    "llm_analytics"
 ]
 
 # Custom User model path
