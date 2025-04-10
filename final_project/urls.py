@@ -37,7 +37,6 @@ urlpatterns = [
     path("api/analytics/", include("analytics.urls")),
     path("api/", include("sql_app.urls")),
     path("api/llm/", include("llm.urls")),
-    path('api/schema/', include('schema.urls')),
     path("api/llm-analytics/", include("llm_analytics.urls")),
 
 ]
