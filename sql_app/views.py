@@ -458,49 +458,61 @@ class InstructorQueryAPIView(APIView):
         """
         try:
             parsed = parse_one(query)
-            
-            # Get all tables referenced in the query
-            referenced_tables = set()
-            for table_ref in parsed.find_all(exp.Table):
-                referenced_tables.add(table_ref.name)
-            
-            # 1. Process SELECT * or table.*
+
+            # Build alias ➝ real table name mapping
+            table_alias_map = {}  # e.g., {"a": "Attempt"}
+            for table in parsed.find_all(exp.Table):
+                alias = table.alias_or_name  # uses alias if present, fallback to name
+                table_alias_map[alias] = table.name
+
+            # Derive real referenced tables
+            referenced_tables = set(table_alias_map.values())
+
+            # 1. Reject SELECT * or table.* for safety
             for star in parsed.find_all(exp.Star):
                 parent = star.parent
                 if isinstance(parent, exp.Select) or isinstance(parent, exp.Alias):
                     table_node = parent.args.get("this")
-                    if table_node:  # Like User.*
+                    if table_node:  # e.g., a.*
                         table_name = table_node.name
-                        if table_name not in ALLOWED_COLUMNS:
+                        if table_name not in table_alias_map:
                             return False
-                        return False  # Reject table.* syntax for safety
+                        resolved_table = table_alias_map.get(table_name)
+                        if resolved_table not in ALLOWED_COLUMNS:
+                            return False
+                        return False  # Reject table.* even if table is allowed
                     else:
-                        return False  # Reject plain SELECT * syntax for safety
-            
-            # 2. Process SELECT specific columns
-            used_columns = set()
+                        return False  # Reject SELECT * (no table prefix)
+
+            # 2. Check SELECT columns against whitelist
+            SENSITIVE_FIELDS = {"password", "hashed_password", "salt"}
+
             for col in parsed.find_all(exp.Column):
-                if col.name != "*":
-                    if col.table:
-                        col_identifier = f"{col.table}.{col.name}"
-                        used_columns.add(col_identifier)
-                        
-                        # Check if this specific column is allowed
-                        if col.table in ALLOWED_COLUMNS and col.name in ALLOWED_COLUMNS[col.table]:
-                            continue
-                        else:
-                            return False
-                    else:
-                        # For columns without explicit table, check if they exist in any allowed table
-                        col_found = False
-                        for table in referenced_tables:
-                            if table in ALLOWED_COLUMNS and col.name in ALLOWED_COLUMNS[table]:
-                                col_found = True
-                                break
-                        
-                        if not col_found:
-                            return False
-            
+                col_name = col.name
+                col_table = col.table
+
+                # Block sensitive fields regardless of alias
+                if col_name.lower() in SENSITIVE_FIELDS:
+                    return False
+
+                if col_table:
+                    resolved_table = table_alias_map.get(col_table)
+                    if not resolved_table:
+                        return False
+                    if resolved_table not in ALLOWED_COLUMNS:
+                        return False
+                    if col_name not in ALLOWED_COLUMNS[resolved_table]:
+                        return False
+                else:
+                    # No table name specified, search all referenced tables
+                    found = False
+                    for table in referenced_tables:
+                        if table in ALLOWED_COLUMNS and col_name in ALLOWED_COLUMNS[table]:
+                            found = True
+                            break
+                    if not found:
+                        return False
+
             return True
         
         except Exception as e:
