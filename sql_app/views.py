@@ -18,6 +18,9 @@ from .permissions import IsAdminUserOrInstructor
 from django.db import connection
 from utils.save_sql_problem_to_db import save_sql_problem_to_db
 from sqlglot import parse_one, exp
+from utils.problem_loader import get_next_problem_id
+from utils.gcs_uploader import upload_problem_to_gcs
+from google.cloud import storage
 
 @api_view(['GET'])
 def problem_list(request):
@@ -385,36 +388,28 @@ class UploadSQLProblemView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        metadata = serializer.get_validated_metadata()
-
         try:
             # Generate new problem_id
-            problems_root = os.path.join(settings.BASE_DIR, "problems")
-            existing_ids = [int(name) for name in os.listdir(problems_root) if name.isdigit()]
-            new_id = max(existing_ids, default=0) + 1
-            problem_dir = os.path.join(problems_root, f"{new_id:03d}")
+            metadata = serializer.get_validated_metadata()
+            files = serializer.get_cleaned_files()
+            new_id = get_next_problem_id()
+            folder = str(new_id).zfill(3)
 
             # Check for duplicates
-            if os.path.exists(problem_dir):
+            client = storage.Client()
+            bucket = client.bucket(settings.GCS_PROBLEM_BUCKET)
+            gcs_conflict = any(blob.name.startswith(f"problems/{folder}/") for blob in bucket.list_blobs(prefix=f"problems/{folder}/"))
+            local_path = os.path.join(settings.BASE_DIR, "problems", folder)
+            if gcs_conflict or os.path.exists(local_path):
                 return Response({"error": f"Problem {new_id} already exists."}, status=400)
-
-            os.makedirs(problem_dir)
 
             # Update metadata and write
             metadata_with_id = {"problem_id": new_id, **metadata}
-            with open(os.path.join(problem_dir, "metadata.json"), "w", encoding="utf-8") as f:
-                json.dump(metadata_with_id, f, indent=2)
-
-            # Write problem.sql
-            with open(os.path.join(problem_dir, "problem.sql"), "wb") as f:
-                f.write(request.FILES["problem_file"].read())
-
-            # Write solution.sql
-            with open(os.path.join(problem_dir, "solution.sql"), "wb") as f:
-                f.write(request.FILES["solution_file"].read())
+            files["metadata.json"] = json.dumps(metadata_with_id, indent=2)
+            upload_problem_to_gcs(new_id, files)
 
             with connection.cursor() as cursor:
-                            save_sql_problem_to_db(cursor, metadata_with_id)
+                save_sql_problem_to_db(cursor, metadata_with_id)
 
             return Response({"message": f"Problem {new_id} uploaded successfully."}, status=201)
 

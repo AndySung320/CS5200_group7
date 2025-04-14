@@ -5,6 +5,7 @@ import os
 from config.db_config import get_mysql_db_config
 from django.conf import settings
 import json
+from utils.problem_loader import load_problem_file
 
 @contextmanager
 def sandbox_schema(db_config):
@@ -55,7 +56,7 @@ def sandbox_schema(db_config):
         cursor.close()
         conn.close()
 
-def run_problem_setup(cursor, ddl_sql_path):
+def run_problem_setup(cursor, problem_id):
     """
     Executes DDL and INSERT statements to set up the problem's database schema and test data.
 
@@ -78,18 +79,14 @@ def run_problem_setup(cursor, ddl_sql_path):
         with sandbox_schema(db_config) as (conn, cursor, schema_name):
             run_problem_setup(cursor, "problems/001/setup.sql")
     """
-    if not os.path.exists(ddl_sql_path):
-        raise FileNotFoundError(f"File not found: {ddl_sql_path}")
-    
-    with open(ddl_sql_path, 'r', encoding='utf-8') as f:
-        ddl_sql = f.read()
+    ddl_sql = load_problem_file(problem_id, "problem.sql")  # return as str
 
     for statement in ddl_sql.split(';'):
         stmt = statement.strip()
         if stmt:
             cursor.execute(stmt)
 
-def get_solution_output(cursor, solution_sql_path):
+def get_solution_output(cursor, problem_id):
     """
     Executes the provided solution SQL file and returns the expected output as a list of dictionaries.
 
@@ -116,16 +113,11 @@ def get_solution_output(cursor, solution_sql_path):
         with sandbox_schema(db_config) as (conn, cursor, schema_name):
             expected_output = get_solution_output(cursor, "problems/001/solution.sql")
     """
-    if not os.path.exists(solution_sql_path):
-        raise FileNotFoundError(f"File not found: {solution_sql_path}")
-    
-    with open(solution_sql_path, 'r', encoding='utf-8') as f:
-        solution_sql = f.read()
+    solution_sql = load_problem_file(problem_id, "solution.sql")
 
     cursor.execute(solution_sql)
     columns = [col[0] for col in cursor.description]
-    result = [dict(zip(columns, row)) for row in cursor.fetchall()]
-    return result
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 def check_user_query(problem_id, user_query):
     """
@@ -171,22 +163,17 @@ def check_user_query(problem_id, user_query):
     try:
         db_config = get_mysql_db_config()
         with sandbox_schema(db_config) as (conn, cursor, _):
-            # Setup DDL & data
-            # Paths for SQL files and metadata
-            base_path = os.path.join(settings.BASE_DIR, "problems", str(problem_id).zfill(3))
-            ddl_path = os.path.join(base_path, "problem.sql")
-            solution_path = os.path.join(base_path, "solution.sql")
-            meta_path = os.path.join(base_path, "metadata.json")
-            
-            # Read metadata (e.g., requires_order flag)
-            with open(meta_path, "r", encoding="utf-8") as f:
-                metadata = json.load(f)
-            requires_order = metadata.get("requires_order", False)
+            # 1. Setup sandbox: schema + test data
+            run_problem_setup(cursor, problem_id)
 
-            # Setup problem schema and test data
-            run_problem_setup(cursor, ddl_path)
+            # 2. Load metadata.json
+            try:
+                metadata = load_problem_file(problem_id, "metadata.json", parse_json=True)
+                requires_order = metadata.get("requires_order", False)
+            except FileNotFoundError:
+                requires_order = False
 
-            # Execute user statements
+            # 3. Execute user's query
             statements = [stmt.strip() for stmt in user_query.strip().split(';') if stmt.strip()]
             if not statements:
                 return False, "No valid SQL statement provided."
@@ -195,7 +182,6 @@ def check_user_query(problem_id, user_query):
             for stmt in statements:
                 try:
                     cursor.execute(stmt)
-
                     if stmt.lower().startswith("select") or stmt.lower().startswith("with"):
                         columns = [col[0] for col in cursor.description]
                         user_result = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -205,15 +191,14 @@ def check_user_query(problem_id, user_query):
             if user_result is None:
                 return False, "No SELECT result found from user query."
 
-            # Load expected output
-            solution_result = get_solution_output(cursor, solution_path)
+            # 4. Get expected output
+            solution_result = get_solution_output(cursor, problem_id)
 
-            # Ignore order if not required
+            # 5. Optional: ignore order
             if not requires_order:
                 user_result = sorted(user_result, key=lambda x: tuple(x.values()))
                 solution_result = sorted(solution_result, key=lambda x: tuple(x.values()))
-            
-            # Compare user result with expected result
+
             if user_result == solution_result:
                 return True, ""
             else:

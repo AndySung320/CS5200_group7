@@ -7,6 +7,7 @@ from utils.sql_sandbox import run_problem_setup, get_solution_output, sandbox_sc
 from config.db_config import get_mysql_db_config
 import traceback
 import re
+from utils.problem_loader import load_problem_file
 
 class SQLProblemListSerializer(serializers.ModelSerializer):
     """
@@ -170,33 +171,28 @@ class SQLProblemDetailSerializer(serializers.ModelSerializer):
 
     def get_tables(self, obj):
         # Load table schema definitions from metadata.json
-        base_path = os.path.join(settings.BASE_DIR, "problems")
-        pattern = os.path.join(base_path, str(obj.problem_id).zfill(3), "metadata.json")
-        for meta_file in glob.glob(pattern):
-            with open(meta_file, "r", encoding="utf-8") as f:
-                return json.load(f).get("tables", [])
-        return []
+        try:
+            metadata = load_problem_file(obj.problem_id, "metadata.json", parse_json=True)
+            return metadata.get("tables", [])
+        except Exception as e:
+            return [{"error": str(e)}]
 
     def get_requires_order(self, obj):
         # Check whether the problem requires row order in output
-        base_path = os.path.join(settings.BASE_DIR, "problems")
-        pattern = os.path.join(base_path, str(obj.problem_id).zfill(3), "metadata.json")
-        for meta_file in glob.glob(pattern):
-            with open(meta_file, "r", encoding="utf-8") as f:
-                return json.load(f).get("requires_order", False)
-        return False
+        try:
+            metadata = load_problem_file(obj.problem_id, "metadata.json", parse_json=True)
+            return metadata.get("requires_order", False)
+        except Exception:
+            return False
 
     def get_expected_output(self, obj):
         # Load expected_output from metadata.json
         try:
-            base_path = os.path.join(settings.BASE_DIR, "problems")
-            pattern = os.path.join(base_path, str(obj.problem_id).zfill(3), "metadata.json")
-            for meta_file in glob.glob(pattern):
-                with open(meta_file, "r", encoding="utf-8") as f:
-                    return json.load(f).get("expected_output", [])
+            metadata = load_problem_file(obj.problem_id, "metadata.json", parse_json=True)
+            return metadata.get("expected_output", [])
         except Exception:
             return {"error": traceback.format_exc()}
-        
+            
     def get_acceptance(self, obj):
         from sql_app.models import Attempt
         total = Attempt.objects.filter(problem=obj).count()
@@ -206,13 +202,11 @@ class SQLProblemDetailSerializer(serializers.ModelSerializer):
         return round(correct / total * 100, 2)
     
     def get_input_data(self, obj):
-        # Load input_data from metadata.json
-        base_path = os.path.join(settings.BASE_DIR, "problems")
-        pattern = os.path.join(base_path, str(obj.problem_id).zfill(3), "metadata.json")
-        for meta_file in glob.glob(pattern):
-            with open(meta_file, "r", encoding="utf-8") as f:
-                return json.load(f).get("input_data", [])
-        return
+        try:
+            metadata = load_problem_file(obj.problem_id, "metadata.json", parse_json=True)
+            return metadata.get("input_data", [])
+        except Exception:
+            return []
 
 class AttemptSerializer(serializers.ModelSerializer):
     """
@@ -335,15 +329,48 @@ FORBIDDEN_IN_SOLUTION = [r"\bDROP\s+TABLE\b", r"\bDROP\s+DATABASE\b"]
 FORBIDDEN_IN_PROBLEM = [r"\bDROP\s+DATABASE\b"]
 
 class ProblemUploadSerializer(serializers.Serializer):
+    """
+    Serializer for validating and processing uploaded SQL problem files.
+
+    Expected multipart/form-data fields:
+        - metadata_file (File): A JSON file containing the problem's metadata.
+        - problem_file (File): A .sql file containing the DDL and sample data (CREATE + INSERT).
+        - solution_file (File): A .sql file containing the expected SELECT query (solution).
+
+    Validation Workflow:
+        - metadata_file: Checks for valid JSON format and required fields/types.
+        - problem_file: Ensures .sql extension and checks for forbidden SQL patterns (e.g., DROP, ALTER).
+        - solution_file: Similar validation for safety and correctness.
+
+    Internal Behavior:
+        - Reads and stores the file content into internal variables for later use (e.g., GCS upload).
+        - Ensures the file pointer is reset (`file.seek(0)`) after validation for downstream compatibility.
+
+    Access Methods:
+        - get_validated_metadata(): Returns the parsed metadata as a dictionary.
+        - get_cleaned_files(): Returns a dict with filenames mapped to their decoded content strings.
+
+    Raises:
+        serializers.ValidationError: On invalid JSON, missing metadata fields, or forbidden SQL patterns.
+
+    Usage:
+        serializer = ProblemUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        metadata = serializer.get_validated_metadata()
+        files = serializer.get_cleaned_files()
+    """
     metadata_file = serializers.FileField()
     problem_file = serializers.FileField()
     solution_file = serializers.FileField()
 
     def validate_metadata_file(self, file):
         try:
-            metadata = json.load(file)
-        except json.JSONDecodeError:
+            raw = file.read().decode("utf-8")
+            metadata = json.loads(raw)
+        except Exception:
             raise serializers.ValidationError("Invalid JSON format in metadata_file.")
+        finally:
+            file.seek(0)  # reset pointer for later
 
         for field, expected_type in REQUIRED_METADATA_FIELDS.items():
             if field not in metadata:
@@ -353,7 +380,9 @@ class ProblemUploadSerializer(serializers.Serializer):
                     f"Field '{field}' must be of type {expected_type.__name__}."
                 )
 
+        # Save to internal variable
         self._validated_metadata = metadata
+        self._metadata_content = raw
         return file
 
     def validate_problem_file(self, file):
@@ -361,12 +390,13 @@ class ProblemUploadSerializer(serializers.Serializer):
             raise serializers.ValidationError("problem_file must be a .sql file.")
 
         content = file.read().decode("utf-8")
-        file.seek(0)  # reset for saving later
+        file.seek(0)
 
         for pattern in FORBIDDEN_IN_PROBLEM:
             if re.search(pattern, content, flags=re.IGNORECASE):
                 raise serializers.ValidationError(f"Forbidden SQL found in problem_file: {pattern}")
 
+        self._problem_content = content
         return file
 
     def validate_solution_file(self, file):
@@ -374,16 +404,24 @@ class ProblemUploadSerializer(serializers.Serializer):
             raise serializers.ValidationError("solution_file must be a .sql file.")
 
         content = file.read().decode("utf-8")
-        file.seek(0)  # reset for saving later
+        file.seek(0)
 
         for pattern in FORBIDDEN_IN_SOLUTION:
             if re.search(pattern, content, flags=re.IGNORECASE):
                 raise serializers.ValidationError(f"Forbidden SQL found in solution_file: {pattern}")
 
+        self._solution_content = content
         return file
 
     def get_validated_metadata(self):
         return self._validated_metadata
+
+    def get_cleaned_files(self):
+        return {
+            "metadata.json": self._metadata_content,
+            "problem.sql": self._problem_content,
+            "solution.sql": self._solution_content,
+        }
 
 class SQLQuerySerializer(serializers.Serializer):
     """

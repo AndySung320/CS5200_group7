@@ -89,6 +89,16 @@ INSTALLED_APPS = [
 # Custom User model path
 AUTH_USER_MODEL = 'users.User'
 
+# Name of the Google Cloud Storage bucket used to store SQL problem content.
+# This bucket holds dynamically uploaded problem folders, each containing:
+#   - metadata.json: problem details and schema
+#   - problem.sql: DDL and sample data
+#   - solution.sql: expected query solution
+#
+# Used by instructor upload APIs and problem loading functions for dynamic content retrieval.
+# Should match the environment variable GCS_PROBLEM_BUCKET set in app.yaml or .env.
+GCS_PROBLEM_BUCKET = "sql-problems-bucket-group7"
+
 # Middleware components for request/response lifecycle
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",  # Enables CORS
